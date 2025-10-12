@@ -1,0 +1,96 @@
+# Global provisioning configuration template.
+#
+# Copy this file to config.yaml or <hostname>.yaml and adjust values as needed.
+# Values in this file provide defaults. Create an additional YAML file named
+# after the current host (e.g. fury.yaml) in the same directory to override
+# specific settings per machine.
+#
+# Boolean flags accept true/false. Omit or set to null to inherit defaults.
+
+steps:
+  ensureGroovy:
+    # Ensure Groovy is installed before running other steps.
+    enabled: true
+
+  adminGroupNopass:
+    # Automatically add the invoking user to the passwordless admin group.
+    adminGroup: admin
+    addCurrentUser: true
+    # Additional accounts to add to the admin group.
+    users:
+      - admnin
+
+  essentials:
+    # Install baseline CLI packages required on all systems.
+    packages:
+      - curl
+      - wget
+      - zip
+      - unzip
+      - rsync
+      - ca-certificates
+      - gnupg
+      - apt-transport-https
+
+  ntp:
+    # Ensure systemd-timesyncd is installed and enabled.
+    enabled: true
+
+  nisSetup:
+    # Provide a domain to enable NIS provisioning; leave null to skip.
+    domain:
+    # Either a bare host/IP or a full "ypserver <host>" line.
+    server:
+
+  nsswitch:
+    # Ensure NIS entries are present in nsswitch.conf.
+    enabled: true
+
+  pamMkhomedir:
+    # Install and enforce pam_mkhomedir for creating home directories.
+    enabled: true
+
+  dockerInstall:
+    # Install Docker Engine and related tooling from the official repository.
+    enabled: true
+
+  dockerDataRoot:
+    # Override the Docker data-root. Set to null to keep the default location.
+    target: /data/docker
+
+  dockerGroup:
+    # Ensure the current user is a member of the docker group.
+    ensureUser: true
+    enabled: true
+
+  sdkmanInstall:
+    # Ensure SDKMAN is present for managing language runtimes.
+    enabled: true
+
+  sdkmanMaven:
+    # Manage Maven installation via SDKMAN.
+    version: null
+    enabled: true
+
+  sdkmanJava:
+    # Manage Java runtimes via SDKMAN.
+    defaultJava: 17.0.16-tem
+    javaVersions:
+      - 17.0.16-tem
+      - 21.0.8-tem
+      - 25-tem
+    enabled: true
+
+  insomnia:
+    # Install the Insomnia API client.
+    enabled: true
+
+  jetbrainsToolbox:
+    # Install JetBrains Toolbox for IDE management.
+    enabled: true
+
+  extendSuspend:
+    # Ensure the system idle suspend delay is extended.
+    enabled: true
+    idleAction: suspend
+    timeout: PT1H
