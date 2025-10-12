@@ -5,25 +5,9 @@
 // Config keys: version (string)
 // Notes: Skips if SDKMAN is not present and only installs when the version differs.
 
-def sh(String cmd) {
-  def p = ["bash","-lc",cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  p.consumeProcessOutput(out, err); p.waitFor()
-  [code:p.exitValue(), out:out.toString().trim(), err:err.toString().trim()]
-}
+import lib.ConfigLoader
+import static lib.StepUtils.sh
 
-def loadConfigLoader = {
-  def scriptDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
-  def loader = new GroovyClassLoader(getClass().classLoader)
-  def configPath = scriptDir.toPath().resolve("../../lib/ConfigLoader.groovy").normalize().toFile()
-  if (!configPath.exists()) {
-    System.err.println("Missing ConfigLoader at ${configPath}")
-    System.exit(1)
-  }
-  loader.parseClass(configPath)
-}
-
-def ConfigLoader = loadConfigLoader()
 def stepKey = "sdkmanMaven"
 if (!ConfigLoader.stepEnabled(stepKey)) {
   println "${stepKey} disabled via configuration"

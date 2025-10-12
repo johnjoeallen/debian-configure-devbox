@@ -5,40 +5,18 @@
 // Config keys: none (enable or disable the step only)
 // Notes: Requires nisSetup to provide domain/server and restarts ypbind/nscd.
 
-def sh(String cmd) {
-  def p = ["bash","-lc",cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  p.consumeProcessOutput(out, err); p.waitFor()
-  [code:p.exitValue(), out:out.toString().trim(), err:err.toString().trim()]
-}
-def writeText(String path, String content) { new File(path).withWriter { it << content } }
-def backup(String path) {
-  def src = new File(path)
-  if (!src.exists()) return null
-  def bak = path + ".bak." + System.currentTimeMillis()
-  src.withInputStream{ i -> new File(bak).withOutputStream{ o -> o << i } }
-  return bak
-}
+import lib.ConfigLoader
+import static lib.StepUtils.backup
+import static lib.StepUtils.sh
+import static lib.StepUtils.writeText
 
-def loadConfigLoader = {
-  def scriptDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
-  def loader = new GroovyClassLoader(getClass().classLoader)
-  def configPath = scriptDir.toPath().resolve("../../lib/ConfigLoader.groovy").normalize().toFile()
-  if (!configPath.exists()) {
-    System.err.println("Missing ConfigLoader at ${configPath}")
-    System.exit(1)
-  }
-  loader.parseClass(configPath)
-}
-
-def ConfigLoader = loadConfigLoader()
 if (!ConfigLoader.stepEnabled("nisSetup")) {
-  println "nisSetup disabled; skipping nsswitch adjustments."
+  println "nisSetup disabled; skipping nsswitch adjustments. ⏭️"
   System.exit(0)
 }
 def stepKey = "nsswitch"
 if (!ConfigLoader.stepEnabled(stepKey)) {
-  println "${stepKey} disabled via configuration"
+  println "${stepKey} disabled via configuration ⏭️"
   System.exit(0)
 }
 def nisConfig = ConfigLoader.stepConfig("nisSetup")
@@ -72,7 +50,7 @@ if (ypConf.exists()) {
 boolean haveDomain = (configDomain && !configDomain.isEmpty()) || systemDomainSet
 boolean haveServer = (configServer && !configServer.isEmpty()) || systemServerSet
 if (!haveDomain || !haveServer) {
-  println "NIS domain/server not detected; skipping nsswitch adjustments."
+  println "NIS domain/server not detected; skipping nsswitch adjustments. ⚠️"
   System.exit(0)
 }
 
@@ -107,6 +85,18 @@ if (changed) {
   backup(nss)
   writeText(nss, content)
 }
-sh("sudo systemctl restart ypbind")
-sh("sudo systemctl restart nscd 2>/dev/null || true")
+def needsYpbindRestart = changed || sh("systemctl is-active --quiet ypbind").code != 0
+if (needsYpbindRestart) {
+  def restart = sh("sudo systemctl restart ypbind")
+  if (restart.code != 0) {
+    System.err.println("Failed to restart ypbind")
+    if (restart.out) { System.err.println(restart.out) }
+    if (restart.err) { System.err.println(restart.err) }
+    System.exit(1)
+  }
+}
+def needsNscdRestart = changed || sh("systemctl is-active --quiet nscd").code != 0
+if (needsNscdRestart) {
+  sh("sudo systemctl restart nscd 2>/dev/null || true")
+}
 System.exit(changed?10:0)

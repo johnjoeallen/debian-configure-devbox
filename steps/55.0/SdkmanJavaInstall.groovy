@@ -5,25 +5,9 @@
 // Config keys: javaVersions (list), javaVersion (string, legacy), defaultJava (string)
 // Notes: Requires sdkmanInstall and skips when SDKMAN is missing.
 
-def sh(String cmd) {
-  def p = ["bash","-lc",cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  p.consumeProcessOutput(out, err); p.waitFor()
-  [code:p.exitValue(), out:out.toString().trim(), err:err.toString().trim()]
-}
+import lib.ConfigLoader
+import static lib.StepUtils.sh
 
-def loadConfigLoader = {
-  def scriptDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
-  def loader = new GroovyClassLoader(getClass().classLoader)
-  def configPath = scriptDir.toPath().resolve("../../lib/ConfigLoader.groovy").normalize().toFile()
-  if (!configPath.exists()) {
-    System.err.println("Missing ConfigLoader at ${configPath}")
-    System.exit(1)
-  }
-  loader.parseClass(configPath)
-}
-
-def ConfigLoader = loadConfigLoader()
 if (!ConfigLoader.stepEnabled("sdkmanInstall")) {
   println "sdkmanInstall disabled; skipping Java installs."
   System.exit(0)
@@ -95,7 +79,7 @@ def changed = false
 def ensureJavaVersion = { String version ->
   def candidateDir = new File("${home}/.sdkman/candidates/java/${version}")
   if (!candidateDir.exists()) {
-    runOrFail("bash -lc '${init} && sdk install java ${version}'")
+    runOrFail("bash -lc '${init} && yes | sdk install java ${version}'")
     changed = true
   }
 }

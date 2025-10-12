@@ -5,33 +5,9 @@
 // Config keys: target (string)
 // Notes: Stops Docker, copies data, rewrites config, then restarts the service.
 
-def sh(String cmd) {
-  def p = ["bash","-lc",cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  p.consumeProcessOutput(out, err); p.waitFor()
-  [code:p.exitValue(), out:out.toString().trim(), err:err.toString().trim()]
-}
-def writeText(String path, String content) { new File(path).withWriter { it << content } }
-def backup(String path) {
-  def src = new File(path)
-  if (!src.exists()) return null
-  def bak = path + ".bak." + System.currentTimeMillis()
-  src.withInputStream{ i -> new File(bak).withOutputStream{ o -> o << i } }
-  return bak
-}
+import lib.ConfigLoader
+import static lib.StepUtils.sh
 
-def loadConfigLoader = {
-  def scriptDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
-  def loader = new GroovyClassLoader(getClass().classLoader)
-  def configPath = scriptDir.toPath().resolve("../../lib/ConfigLoader.groovy").normalize().toFile()
-  if (!configPath.exists()) {
-    System.err.println("Missing ConfigLoader at ${configPath}")
-    System.exit(1)
-  }
-  loader.parseClass(configPath)
-}
-
-def ConfigLoader = loadConfigLoader()
 def stepKey = "dockerDataRoot"
 if (!ConfigLoader.stepEnabled(stepKey)) {
   println "${stepKey} disabled via configuration"

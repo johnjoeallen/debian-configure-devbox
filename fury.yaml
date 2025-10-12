@@ -18,7 +18,7 @@ steps:
     addCurrentUser: true
     # Additional accounts to add to the admin group.
     users:
-      - admin
+      - jallen
 
   essentials:
     # Install baseline CLI packages required on all systems.
@@ -38,9 +38,9 @@ steps:
 
   nisSetup:
     # Provide a domain to enable NIS provisioning; leave null to skip.
-    domain:
+    domain: dublinux.net
     # Either a bare host/IP or a full "ypserver <host>" line.
-    server:
+    server: 10.0.0.1
 
   nsswitch:
     # Ensure NIS entries are present in nsswitch.conf.
@@ -69,7 +69,7 @@ steps:
 
   sdkmanMaven:
     # Manage Maven installation via SDKMAN.
-    version:
+    version: null
     enabled: true
 
   sdkmanJava:
@@ -85,12 +85,12 @@ steps:
     # Install the Insomnia API client.
     enabled: true
 
-  googleChrome:
-    # Install Google Chrome Stable via the Google apt repository.
-    enabled: false
-
   jetbrainsToolbox:
     # Install JetBrains Toolbox for IDE management.
+    enabled: true
+
+  googleChrome:
+    # Install Google Chrome Stable via the Google apt repository.
     enabled: true
 
   extendSuspend:

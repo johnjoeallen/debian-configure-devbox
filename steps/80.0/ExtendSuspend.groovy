@@ -8,26 +8,9 @@
 import java.nio.file.Paths
 import java.time.Duration
 
-Map sh(String cmd) {
-  def proc = ["bash", "-lc", cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  proc.consumeProcessOutput(out, err)
-  proc.waitFor()
-  [code: proc.exitValue(), out: out.toString().trim(), err: err.toString().trim()]
-}
+import lib.ConfigLoader
+import static lib.StepUtils.sh
 
-Class loadConfigLoader() {
-  def scriptDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
-  def loader = new GroovyClassLoader(getClass().classLoader)
-  def configPath = scriptDir.toPath().resolve("../../lib/ConfigLoader.groovy").normalize().toFile()
-  if (!configPath.exists()) {
-    System.err.println("Missing ConfigLoader at ${configPath}")
-    System.exit(1)
-  }
-  loader.parseClass(configPath)
-}
-
-def ConfigLoader = loadConfigLoader()
 def stepKey = "extendSuspend"
 if (!ConfigLoader.stepEnabled(stepKey)) {
   println "${stepKey} disabled via configuration"

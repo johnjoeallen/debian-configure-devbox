@@ -5,34 +5,11 @@
 // Config keys: adminGroup (string), addCurrentUser (boolean), users (list of usernames)
 // Notes: Validates sudoers syntax after writing drop-in files.
 
-def sh(String cmd) {
-  def p = ["bash","-lc",cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  p.consumeProcessOutput(out, err); p.waitFor()
-  [code:p.exitValue(), out:out.toString().trim(), err:err.toString().trim()]
-}
-def writeText(String path, String content) { new File(path).withWriter { it << content } }
-def backup(String path) {
-  def src = new File(path)
-  if (!src.exists()) return null
-  def bak = path + ".bak." + System.currentTimeMillis()
-  src.withInputStream{ i -> new File(bak).withOutputStream{ o -> o << i } }
-  return bak
-}
+import lib.ConfigLoader
+import static lib.StepUtils.backup
+import static lib.StepUtils.sh
+import static lib.StepUtils.writeText
 
-
-def loadConfigLoader = {
-  def scriptDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
-  def loader = new GroovyClassLoader(getClass().classLoader)
-  def configPath = scriptDir.toPath().resolve("../../lib/ConfigLoader.groovy").normalize().toFile()
-  if (!configPath.exists()) {
-    System.err.println("Missing ConfigLoader at ${configPath}")
-    System.exit(1)
-  }
-  loader.parseClass(configPath)
-}
-
-def ConfigLoader = loadConfigLoader()
 def stepKey = "adminGroupNopass"
 if (!ConfigLoader.stepEnabled(stepKey)) {
   println "${stepKey} disabled via configuration"
@@ -124,13 +101,13 @@ if (addCurrentUser) {
 
 desiredUsers.each { user ->
   if (sh("id -u ${user} >/dev/null 2>&1").code != 0) {
-    println("Skipping user ${user}; account not found.")
+    println("Skipping user ${user}; account not found. ⚠️")
     return
   }
   def inAdmin = sh("id -nG ${user} | tr ' ' '\n' | grep -qx ${adminGroup}")
   if (inAdmin.code != 0) {
     runOrFail("sudo usermod -aG ${adminGroup} ${user}")
-    println("Added ${user} to ${adminGroup}. Please log out and back in for group membership to apply.")
+    println("Added ${user} to ${adminGroup}. Please log out and back in for group membership to apply. 🎉")
     changed = true
   }
 }

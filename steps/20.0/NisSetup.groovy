@@ -5,36 +5,14 @@
 // Config keys: domain (string), server (string)
 // Notes: Installs required packages, skips when domain or server are absent, and restarts ypbind/nscd.
 
-def sh(String cmd) {
-  def p = ["bash","-lc",cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  p.consumeProcessOutput(out, err); p.waitFor()
-  [code:p.exitValue(), out:out.toString().trim(), err:err.toString().trim()]
-}
-def writeText(String path, String content) { new File(path).withWriter { it << content } }
-def backup(String path) {
-  def src = new File(path)
-  if (!src.exists()) return null
-  def bak = path + ".bak." + System.currentTimeMillis()
-  src.withInputStream{ i -> new File(bak).withOutputStream{ o -> o << i } }
-  return bak
-}
+import lib.ConfigLoader
+import static lib.StepUtils.backup
+import static lib.StepUtils.sh
+import static lib.StepUtils.writeText
 
-def loadConfigLoader = {
-  def scriptDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
-  def loader = new GroovyClassLoader(getClass().classLoader)
-  def configPath = scriptDir.toPath().resolve("../../lib/ConfigLoader.groovy").normalize().toFile()
-  if (!configPath.exists()) {
-    System.err.println("Missing ConfigLoader at ${configPath}")
-    System.exit(1)
-  }
-  loader.parseClass(configPath)
-}
-
-def ConfigLoader = loadConfigLoader()
 def stepKey = "nisSetup"
 if (!ConfigLoader.stepEnabled(stepKey)) {
-  println "${stepKey} disabled via configuration"
+  println "${stepKey} disabled via configuration ⏭️"
   System.exit(0)
 }
 def stepConfig = ConfigLoader.stepConfig(stepKey)
@@ -44,7 +22,7 @@ def isBlank = { v -> v == null || v.toString().trim().isEmpty() }
 def desiredDomain = stepConfig.domain?.toString()?.trim()
 def serverValue = stepConfig.server?.toString()?.trim()
 if (isBlank(desiredDomain) || isBlank(serverValue)) {
-  println "NIS configuration missing domain or server in merged configuration. Skipping."
+  println "NIS configuration missing domain or server in merged configuration. Skipping. ⚠️"
   System.exit(0)
 }
 
@@ -53,7 +31,7 @@ def sourceMsg = []
 if (configMeta?.base && configMeta.base.exists()) sourceMsg << configMeta.base.path
 if (configMeta?.host && configMeta.host.exists()) sourceMsg << configMeta.host.path
 if (sourceMsg) {
-  println "Using NIS config from ${sourceMsg.join(' + ')}"
+  println "Using NIS config from ${sourceMsg.join(' + ')} 📁"
 }
 def serverLine = serverValue.startsWith("ypserver") ? serverValue : "ypserver ${serverValue}"
 
@@ -95,6 +73,12 @@ if (!ypconf.exists() || !(ypconf.text.contains(serverLine))) {
   writeText("/etc/yp.conf", serverLine + "\n")
   changed = true
 }
-runOrFail("systemctl restart ypbind", "restart ypbind")
-sh("systemctl restart nscd 2>/dev/null || true")
+def needsYpbindRestart = changed || sh("systemctl is-active --quiet ypbind").code != 0
+if (needsYpbindRestart) {
+  runOrFail("systemctl restart ypbind", "restart ypbind")
+}
+def needsNscdRestart = changed || sh("systemctl is-active --quiet nscd").code != 0
+if (needsNscdRestart) {
+  sh("systemctl restart nscd 2>/dev/null || true")
+}
 System.exit(changed ? 10 : 0)

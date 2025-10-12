@@ -1,3 +1,5 @@
+package lib
+
 class ConfigLoader {
   private static Map cachedConfig = null
   private static Map cachedMeta = null

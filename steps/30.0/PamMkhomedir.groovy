@@ -5,20 +5,9 @@
 // Config keys: none
 // Notes: Installs required PAM modules and ensures session lines exist once.
 
-def sh(String cmd) {
-  def p = ["bash","-lc",cmd].execute()
-  def out = new StringBuffer(); def err = new StringBuffer()
-  p.consumeProcessOutput(out, err); p.waitFor()
-  [code:p.exitValue(), out:out.toString().trim(), err:err.toString().trim()]
-}
-def writeText(String path, String content) { new File(path).withWriter { it << content } }
-def backup(String path) {
-  def src = new File(path)
-  if (!src.exists()) return null
-  def bak = path + ".bak." + System.currentTimeMillis()
-  src.withInputStream{ i -> new File(bak).withOutputStream{ o -> o << i } }
-  return bak
-}
+import static lib.StepUtils.backup
+import static lib.StepUtils.sh
+import static lib.StepUtils.writeText
 
 def changed=false
 def runOrFail = { String cmd ->
