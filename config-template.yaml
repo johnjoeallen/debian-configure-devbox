@@ -18,7 +18,7 @@ steps:
     addCurrentUser: true
     # Additional accounts to add to the admin group.
     users:
-      - admnin
+      - admin
 
   essentials:
     # Install baseline CLI packages required on all systems.
@@ -69,7 +69,7 @@ steps:
 
   sdkmanMaven:
     # Manage Maven installation via SDKMAN.
-    version: null
+    version:
     enabled: true
 
   sdkmanJava:
