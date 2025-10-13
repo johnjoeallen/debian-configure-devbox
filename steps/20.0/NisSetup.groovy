@@ -47,6 +47,17 @@ def runOrFail = { String cmd, String context ->
 }
 
 def changed = false
+
+def ensureEnabled = { String service ->
+  def status = sh("systemctl is-enabled ${service} 2>/dev/null")
+  def normalized = status.out?.trim()?.toLowerCase()
+  def acceptable = ['enabled', 'static', 'linked', 'alias', 'enabled-runtime']
+  if (status.code != 0 || !(normalized in acceptable)) {
+    runOrFail("systemctl enable ${service}", "enable ${service}")
+    changed = true
+  }
+}
+
 def requiredPkgs = ["nis", "nscd"]
 def missingPkgs = requiredPkgs.findAll { name ->
   sh("dpkg -s ${name} >/dev/null 2>&1").code != 0
@@ -73,6 +84,8 @@ if (!ypconf.exists() || !(ypconf.text.contains(serverLine))) {
   writeText("/etc/yp.conf", serverLine + "\n")
   changed = true
 }
+ensureEnabled('ypbind')
+ensureEnabled('nscd')
 def needsYpbindRestart = changed || sh("systemctl is-active --quiet ypbind").code != 0
 if (needsYpbindRestart) {
   runOrFail("systemctl restart ypbind", "restart ypbind")
