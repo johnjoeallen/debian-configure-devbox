@@ -25,8 +25,10 @@ if (!need) System.exit(0)
 
 def cmds = [
   "sudo systemctl stop docker",
-  "sudo mkdir -p '${target}'",
+  "sudo install -d -m 0770 -o root -g docker '${target}'",
   "sudo rsync -aP /var/lib/docker/ '${target}/'",
+  "sudo chown -R root:docker '${target}'",
+  "sudo chmod -R g+rwX '${target}'",
   "sudo mv /var/lib/docker /var/lib/docker.bak.\$(date +%s)",
   "sudo install -d -m 0711 -o root -g root /etc/docker",
   """bash -lc 'cat > /etc/docker/daemon.json <<EOF
