@@ -68,12 +68,17 @@ if (missingPkgs) {
   changed = true
 }
 def curDom = sh("domainname || true").out
-if (curDom != desiredDomain) {
+def normalizedCurDom = curDom?.trim()
+if (normalizedCurDom?.equalsIgnoreCase("(none)") || normalizedCurDom?.equalsIgnoreCase("localdomain")) {
+  normalizedCurDom = ""
+}
+boolean domainMatches = normalizedCurDom != null && !normalizedCurDom.isEmpty() && normalizedCurDom.equalsIgnoreCase(desiredDomain)
+if (!domainMatches) {
   runOrFail("domainname ${desiredDomain}", "set domainname")
   changed = true
 }
 def defaultdomain = new File("/etc/defaultdomain")
-if (!defaultdomain.exists() || defaultdomain.text.trim() != desiredDomain) {
+if (!defaultdomain.exists() || !defaultdomain.text.trim().equalsIgnoreCase(desiredDomain)) {
   backup("/etc/defaultdomain")
   writeText("/etc/defaultdomain", desiredDomain + "\n")
   changed = true
