@@ -20,18 +20,37 @@ if (!target) {
   target = "/data/docker"
 }
 
-def need = sh("""bash -lc 'docker info 2>/dev/null | grep -q "Docker Root Dir: ${target}"'""").code!=0
-if (!need) System.exit(0)
+def normalizePath = { String path ->
+  if (!path) {
+    return null
+  }
+  def trimmed = path.trim()
+  if (!trimmed) {
+    return null
+  }
+  if (trimmed == "/") {
+    return "/"
+  }
+  return trimmed.replaceAll(/\/+$/, '')
+}
 
-def cmds = [
-  "sudo systemctl stop docker",
-  "sudo install -d -m 0770 -o root -g docker '${target}'",
-  "sudo rsync -aP /var/lib/docker/ '${target}/'",
-  "sudo chown -R root:docker '${target}'",
-  "sudo chmod -R g+rwX '${target}'",
-  "sudo mv /var/lib/docker /var/lib/docker.bak.\$(date +%s)",
-  "sudo install -d -m 0711 -o root -g root /etc/docker",
-  """bash -lc 'cat > /etc/docker/daemon.json <<EOF
+def dockerRootResult = sh("docker info --format '{{ .DockerRootDir }}' 2>/dev/null || true")
+def currentRoot = dockerRootResult.out?.trim()
+def normalizedTarget = normalizePath(target)
+def normalizedCurrent = normalizePath(currentRoot)
+boolean needMove = normalizedCurrent == null || normalizedTarget == null || normalizedCurrent != normalizedTarget
+boolean changed = false
+
+if (needMove) {
+  def cmds = [
+    "sudo systemctl stop docker",
+    "sudo install -d -m 0770 -o root -g docker '${target}'",
+    "sudo rsync -aP /var/lib/docker/ '${target}/'",
+    "sudo chown -R root:docker '${target}'",
+    "sudo chmod -R g+rwX '${target}'",
+    "sudo mv /var/lib/docker /var/lib/docker.bak.\$(date +%s)",
+    "sudo install -d -m 0711 -o root -g root /etc/docker",
+    """bash -lc 'cat > /etc/docker/daemon.json <<EOF
 {
   "data-root": "${target}",
   "log-driver": "local",
@@ -39,9 +58,45 @@ def cmds = [
   "storage-driver": "overlay2"
 }
 EOF'""",
-  "sudo systemctl daemon-reload",
-  "sudo systemctl start docker"
-]
-for (c in cmds) { if (sh(c).code!=0) System.exit(1) }
-println sh("""bash -lc 'docker info | grep -E "Docker Root Dir|Storage Driver|Logging Driver"'""").out
-System.exit(10)
+    "sudo systemctl daemon-reload",
+    "sudo systemctl start docker"
+  ]
+  for (c in cmds) {
+    if (sh(c).code != 0) {
+      System.exit(1)
+    }
+  }
+  println sh("""bash -lc 'docker info | grep -E "Docker Root Dir|Storage Driver|Logging Driver"'""").out
+  changed = true
+  currentRoot = target
+  normalizedCurrent = normalizePath(currentRoot)
+}
+
+def pathToVerify = normalizedCurrent ? currentRoot : target
+def desiredMode = "770"
+if (pathToVerify) {
+  def statRes = sh("stat -c '%U:%G %a' '${pathToVerify}' 2>/dev/null || true")
+  boolean ownerMatches = false
+  boolean modeMatches = false
+  if (statRes.code == 0) {
+    def tokens = statRes.out?.trim()?.split(/\s+/)
+    if (tokens?.size() >= 1) {
+      ownerMatches = tokens[0] == "root:docker"
+    }
+    if (tokens?.size() >= 2) {
+      modeMatches = tokens[1] == desiredMode
+    }
+  }
+  if (!ownerMatches || !modeMatches) {
+    def installRes = sh("sudo install -d -m 0770 -o root -g docker '${pathToVerify}'")
+    if (installRes.code != 0) {
+      System.exit(1)
+    }
+    changed = true
+    println "Adjusted ownership for ${pathToVerify} to root:docker"
+  }
+} else {
+  System.err.println("Unable to determine Docker data directory for ownership check")
+}
+
+System.exit(changed ? 10 : 0)
