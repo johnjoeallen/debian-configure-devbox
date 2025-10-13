@@ -12,7 +12,7 @@ Automation scripts for provisioning Debian-based development machines with a rep
    ```
 3. Clone this repository and change into the project directory:
    ```bash
-   git clone https://github.com/your-org/debian-configure-devbox.git
+   git clone https://github.com/johnjoeallen/debian-configure-devbox.git
    cd debian-configure-devbox
    ```
 4. Copy `config-template.yaml` to `config.yaml` or to `<hostname>.yaml` (where `<hostname>` matches `hostname -s`) and adjust values as needed.
