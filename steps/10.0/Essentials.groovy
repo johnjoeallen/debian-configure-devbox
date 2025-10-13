@@ -49,7 +49,12 @@ if (packages.isEmpty()) {
 }
 
 def missing = packages.findAll { pkg ->
-  sh("dpkg -s ${pkg} >/dev/null 2>&1").code != 0
+  def status = sh("""dpkg-query -W -f='\\${Status}' ${pkg} 2>/dev/null""")
+  if (status.code != 0) {
+    return true
+  }
+  def normalized = status.out?.trim()?.toLowerCase()
+  return normalized != 'install ok installed'
 }
 
 if (missing) {
