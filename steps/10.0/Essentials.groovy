@@ -2,16 +2,69 @@
 // RUN_AS_ROOT
 // --- Documentation ---
 // Summary: Install baseline CLI packages required for provisioning.
-// Config keys: none
+// Config keys: packages (list of package names)
 // Notes: Uses apt to install any missing packages only.
 
+import lib.ConfigLoader
 import static lib.StepUtils.sh
 
-def pkgs = ["curl","wget","zip","unzip","rsync","ca-certificates","gnupg","apt-transport-https"]
-def need = pkgs.findAll { sh("dpkg -s ${it} >/dev/null 2>&1").code!=0 }
-if (need) {
-  def r = sh("sudo apt update && sudo apt install -y " + need.join(" "))
-  if (r.code!=0) { System.err.println(r.err); System.exit(1) }
+def stepKey = "essentials"
+if (!ConfigLoader.stepEnabled(stepKey)) {
+  println "${stepKey} disabled via configuration"
+  System.exit(0)
+}
+def stepConfig = ConfigLoader.stepConfig(stepKey)
+
+def defaultPackages = ["curl", "wget", "zip", "unzip", "rsync", "ca-certificates", "gnupg", "apt-transport-https"]
+
+def collectPackages = { value ->
+  def collected = []
+  if (value instanceof Collection) {
+    value.each { pkg ->
+      def name = pkg?.toString()?.trim()
+      if (name) {
+        collected << name
+      }
+    }
+  } else if (value != null) {
+    def name = value.toString().trim()
+    if (name) {
+      collected << name
+    }
+  }
+  collected
+}
+
+def packages = new LinkedHashSet<String>()
+def configuredPackages = collectPackages(stepConfig.packages)
+if (configuredPackages) {
+  packages.addAll(configuredPackages)
+} else {
+  packages.addAll(defaultPackages)
+}
+
+if (packages.isEmpty()) {
+  println "No packages defined for ${stepKey}; skipping"
+  System.exit(0)
+}
+
+def missing = packages.findAll { pkg ->
+  sh("dpkg -s ${pkg} >/dev/null 2>&1").code != 0
+}
+
+if (missing) {
+  def installCmd = "sudo apt update && sudo apt install -y ${missing.join(' ')}"
+  def result = sh(installCmd)
+  if (result.code != 0) {
+    if (result.out) {
+      System.err.println(result.out)
+    }
+    if (result.err) {
+      System.err.println(result.err)
+    }
+    System.exit(1)
+  }
   System.exit(10)
 }
+
 System.exit(0)
