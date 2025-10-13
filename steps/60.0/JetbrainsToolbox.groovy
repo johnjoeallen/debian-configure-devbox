@@ -4,10 +4,6 @@
 // Config keys: none
 // Notes: Downloads the latest tarball, extracts, and runs the installer once.
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-
 import static lib.StepUtils.sh
 
 def home = System.getenv("HOME") ?: System.getProperty("user.home")
@@ -21,19 +17,35 @@ if (marker.exists()) {
   System.exit(0)
 }
 
-Path tempPath
-try {
-  def userLabel = (System.getenv('USER') ?: 'user').replaceAll(/[^A-Za-z0-9._-]/, '_')
-  tempPath = Files.createTempDirectory(Paths.get('/tmp'), "jetbrains-toolbox-${userLabel}-")
-} catch (Exception e) {
-  System.err.println("Unable to create temporary directory in /tmp: ${e.message}")
+def installDir = new File(home, "jetbrains")
+if (!installDir.exists() && !installDir.mkdirs()) {
+  System.err.println("Unable to create installation directory ${installDir.absolutePath}")
   System.exit(1)
 }
-def tmpDir = tempPath.toFile()
-println "Using temporary directory ${tmpDir.absolutePath}"
+println "Using installation directory ${installDir.absolutePath}"
 
-def archivePath = new File(tmpDir, "toolbox.tar.gz").absolutePath
-def workDir = new File(tmpDir, "jb").absolutePath
+def archiveFile = new File(installDir, "toolbox.tar.gz")
+if (archiveFile.exists() && !archiveFile.delete()) {
+  System.err.println("Unable to remove existing archive ${archiveFile.absolutePath}")
+  System.exit(1)
+}
+def workDirFile = new File(installDir, "toolbox")
+if (workDirFile.exists() && !workDirFile.deleteDir()) {
+  def cleanup = sh("rm -rf '${workDirFile.absolutePath}'")
+  if (cleanup.code != 0) {
+    System.err.println("Unable to clean previous extraction directory ${workDirFile.absolutePath}")
+    if (cleanup.out) System.err.println(cleanup.out)
+    if (cleanup.err) System.err.println(cleanup.err)
+    System.exit(1)
+  }
+}
+if (!workDirFile.mkdirs()) {
+  System.err.println("Unable to create extraction directory ${workDirFile.absolutePath}")
+  System.exit(1)
+}
+
+def archivePath = archiveFile.absolutePath
+def workDir = workDirFile.absolutePath
 
 def download = sh("wget -O '${archivePath}' 'https://data.services.jetbrains.com/products/download?code=TBA&platform=linux'")
 if (download.code != 0) {
@@ -42,19 +54,12 @@ if (download.code != 0) {
   System.exit(1)
 }
 
-def extractCmd = "mkdir -p '${workDir}' && tar -xzf '${archivePath}' -C '${workDir}' && cd '${workDir}'/jetbrains-toolbox* && nohup ./bin/jetbrains-toolbox >/dev/null 2>&1 &"
+def extractCmd = "tar -xzf '${archivePath}' -C '${workDir}' && cd '${workDir}'/jetbrains-toolbox* && nohup ./bin/jetbrains-toolbox >/dev/null 2>&1 &"
 def extract = sh(extractCmd)
 if (extract.code != 0) {
   if (extract.out) System.err.println(extract.out)
   if (extract.err) System.err.println(extract.err)
   System.exit(1)
-}
-
-if (!tmpDir.deleteDir()) {
-  def cleanup = sh("rm -rf '${tmpDir.absolutePath}'")
-  if (cleanup.code != 0) {
-    System.err.println("Warning: unable to remove temporary directory ${tmpDir.absolutePath}")
-  }
 }
 
 System.exit(10)
