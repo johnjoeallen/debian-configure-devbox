@@ -48,8 +48,10 @@ if (packages.isEmpty()) {
   System.exit(0)
 }
 
+def dpkgStatusFormat = "\${Status}"
+
 def missing = packages.findAll { pkg ->
-  def status = sh("""dpkg-query -W -f='\\${Status}' ${pkg} 2>/dev/null""")
+  def status = sh("dpkg-query -W -f='${dpkgStatusFormat}' ${pkg} 2>/dev/null")
   if (status.code != 0) {
     return true
   }
