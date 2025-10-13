@@ -61,6 +61,8 @@ steps:
   dockerGroup:
     # Ensure the current user is a member of the docker group.
     ensureUser: true
+    # Additional accounts to place in the docker group.
+    users: []
     enabled: true
 
   sdkmanInstall:
