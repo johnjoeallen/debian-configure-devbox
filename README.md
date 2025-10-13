@@ -2,11 +2,26 @@
 
 Automation scripts for provisioning Debian-based development machines with a repeatable set of tooling.
 
-## Running the provisioner
+## Getting started
 
-1. Copy `config-template.yaml` to `config.yaml` or to `<hostname>.yaml` (where `<hostname>` matches `hostname -s`) and adjust values as needed.
-2. Execute `./configure.sh` from the repository root. The script installs Groovy if required, then runs each step in sorted order.
-3. Steps exit with `0` when no changes are needed and `10` when modifications were made. The driver script pauses on changes or errors unless `PAUSE_ON_CHANGED=0` or `PAUSE_ON_ERROR=0` are exported.
+1. Ensure your account can run commands with `sudo`. If not, ask an administrator to add you to the `sudo` group (or run the provisioner from an account that already has elevated privileges).
+2. Install Git if it is not already present:
+   ```bash
+   sudo apt update
+   sudo apt install -y git
+   ```
+3. Clone this repository and change into the project directory:
+   ```bash
+   git clone https://github.com/your-org/debian-configure-devbox.git
+   cd debian-configure-devbox
+   ```
+4. Copy `config-template.yaml` to `config.yaml` or to `<hostname>.yaml` (where `<hostname>` matches `hostname -s`) and adjust values as needed.
+5. Run the provisioner:
+   ```bash
+   ./configure.sh
+   ```
+   The script installs Groovy if required, then runs each step in sorted order.
+5. Steps exit with `0` when no changes are needed and `10` when modifications were made. The driver script pauses on changes or errors unless `PAUSE_ON_CHANGED=0` or `PAUSE_ON_ERROR=0` are exported.
 
 ## Configuration basics
 
