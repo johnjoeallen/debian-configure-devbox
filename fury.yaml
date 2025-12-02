@@ -8,11 +8,7 @@
 # Boolean flags accept true/false. Omit or set to null to inherit defaults.
 
 steps:
-  ensureGroovy:
-    # Ensure Groovy is installed before running other steps.
-    enabled: true
-
-  adminGroupNopass:
+  AdminGroupNopass:
     # Automatically add the invoking user to the passwordless admin group.
     adminGroup: admin
     addCurrentUser: true
@@ -20,7 +16,7 @@ steps:
     users:
       - jallen
 
-  essentials:
+  Essentials:
     # Install baseline CLI packages required on all systems.
     packages:
       - curl
@@ -31,34 +27,35 @@ steps:
       - ca-certificates
       - gnupg
       - apt-transport-https
+      - neovim alias vim
 
-  ntp:
+  Ntp:
     # Ensure systemd-timesyncd is installed and enabled.
     enabled: true
 
-  nisSetup:
+  NisSetup:
     # Provide a domain to enable NIS provisioning; leave null to skip.
     domain: dublinux.net
     # Either a bare host/IP or a full "ypserver <host>" line.
     server: 10.0.0.1
 
-  nsswitch:
+  Nsswitch:
     # Ensure NIS entries are present in nsswitch.conf.
     enabled: true
 
-  pamMkhomedir:
+  PamMkhomedir:
     # Install and enforce pam_mkhomedir for creating home directories.
     enabled: true
 
-  dockerInstall:
+  DockerInstall:
     # Install Docker Engine and related tooling from the official repository.
     enabled: true
 
-  dockerDataRoot:
+  DockerDataRoot:
     # Override the Docker data-root. Set to null to keep the default location.
     target: /data/docker
 
-  dockerGroup:
+  DockerGroup:
     # Ensure the current user is a member of the docker group.
     ensureUser: true
     # Additional accounts to place in the docker group.
@@ -66,16 +63,16 @@ steps:
       - jallen
     enabled: true
 
-  sdkmanInstall:
+  SdkmanInstall:
     # Ensure SDKMAN is present for managing language runtimes.
     enabled: true
 
-  sdkmanMaven:
+  SdkmanMavenInstall:
     # Manage Maven installation via SDKMAN.
     version: null
     enabled: true
 
-  sdkmanJava:
+  SdkmanJavaInstall:
     # Manage Java runtimes via SDKMAN.
     defaultJava: 17.0.16-tem
     javaVersions:
@@ -84,19 +81,19 @@ steps:
       - 25-tem
     enabled: true
 
-  insomnia:
+  Insomnia:
     # Install the Insomnia API client.
     enabled: true
 
-  jetbrainsToolbox:
+  JetbrainsToolbox:
     # Install JetBrains Toolbox for IDE management.
     enabled: true
 
-  googleChrome:
+  GoogleChromeInstall:
     # Install Google Chrome Stable via the Google apt repository.
     enabled: true
 
-  extendSuspend:
+  ExtendSuspend:
     # Ensure the system idle suspend delay is extended.
     enabled: true
     idleAction: suspend
