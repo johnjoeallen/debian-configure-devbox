@@ -1,0 +1,45 @@
+steps:
+  AdminGroupNopass:
+    enabled: true
+
+  Essentials:
+    enabled: true
+
+  Ntp:
+    enabled: true
+
+  Nsswitch:
+    enabled: true
+
+  PamMkhomedir:
+    enabled: true
+
+  GoogleChromeInstall:
+    enabled: true
+
+  JetbrainsToolbox:
+    enabled: true
+
+  Insomnia:
+    enabled: true
+
+  SdkmanInstall:
+    enabled: true
+
+  SdkmanJavaInstall:
+    enabled: true
+
+  SdkmanMavenInstall:
+    enabled: true
+
+  ExtendSuspend:
+    enabled: true
+
+  DockerInstall:
+    enabled: true
+
+  DockerGroup:
+    enabled: true
+
+  DockerDataRoot:
+    enabled: true

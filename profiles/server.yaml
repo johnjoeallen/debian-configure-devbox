@@ -1,0 +1,33 @@
+steps:
+  AdminGroupNopass:
+    enabled: true
+
+  Essentials:
+    enabled: true
+
+  Ntp:
+    enabled: true
+
+  NisSetup:
+    enabled: true
+
+  Nsswitch:
+    enabled: true
+
+  PamMkhomedir:
+    enabled: true
+
+  DebianMirror:
+    enabled: true
+
+  DockerInstall:
+    enabled: true
+
+  DockerGroup:
+    enabled: true
+
+  DockerDataRoot:
+    enabled: true
+
+  ExtendSuspend:
+    enabled: true
