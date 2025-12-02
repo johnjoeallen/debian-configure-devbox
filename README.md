@@ -23,6 +23,26 @@ Automation scripts for provisioning Debian-based development machines with a rep
    The script installs Groovy if required, then runs each step in sorted order.
 5. Steps exit with `0` when no changes are needed and `10` when modifications were made. The driver script pauses on changes or errors unless `PAUSE_ON_CHANGED=0` or `PAUSE_ON_ERROR=0` are exported.
 
+### Using profiles
+
+You can bundle step selections into reusable profiles. Profiles live in `profiles/<name>.yaml` and look just like regular configuration files. By convention they set `steps.<stepKey>.enabled: true` so the referenced steps are active by default.
+
+Run the provisioner with one or more profiles:
+
+```bash
+./configure.sh --profiles=server,dev
+```
+
+The loader merges configuration in this order (later wins):
+
+1. Profile files (in the order specified on the command line)
+2. `config.yaml`
+3. `<hostname>.yaml`
+
+If `enabled` is defined in `config.yaml` or `<hostname>.yaml`, it overrides the profile defaults.
+
+> **Note**: `config.yaml` (or `<hostname>.yaml`) must exist even when using profiles, and every step that remains enabled needs a corresponding `steps.<stepKey>` entry in the merged configuration.
+
 ## Configuration basics
 
 Configuration files are merged with `config.yaml` acting as defaults and an optional host-specific override file. If you prefer to manage everything per-host, you can omit `config.yaml` entirely and create `<hostname>.yaml` instead. Each step can be disabled by setting `steps.<stepKey>.enabled: false`.

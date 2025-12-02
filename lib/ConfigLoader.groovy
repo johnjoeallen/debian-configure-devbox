@@ -8,12 +8,23 @@ class ConfigLoader {
     if (cachedConfig != null) {
       return cachedConfig
     }
+    def profileDir = resolveProfileDir()
+    def profileNames = resolveProfileNames()
+    List<File> profileFiles = []
+    Map mergedProfiles = [:]
+    profileNames.each { String name ->
+      File file = profileFile(profileDir, name)
+      profileFiles << file
+      mergedProfiles = deepMerge(mergedProfiles, parseYamlFile(file))
+    }
     def baseFile = resolveBaseFile()
     def hostFile = resolveHostFile()
     def baseCfg = parseYamlFile(baseFile)
     def hostCfg = parseYamlFile(hostFile)
-    cachedMeta = [base: baseFile, host: hostFile]
-    cachedConfig = deepMerge(baseCfg, hostCfg)
+    Map combined = deepMerge(mergedProfiles, baseCfg)
+    combined = deepMerge(combined, hostCfg)
+    cachedMeta = [profiles: profileFiles, base: baseFile, host: hostFile]
+    cachedConfig = combined
     return cachedConfig
   }
 
@@ -23,18 +34,35 @@ class ConfigLoader {
   }
 
   static Map stepConfig(String key) {
-    def all = loadAll()
-    def steps = (all.steps instanceof Map) ? all.steps : [:]
-    def cfg = steps[key]
-    return (cfg instanceof Map) ? new LinkedHashMap(cfg) : [:]
+    def cfg = stepConfigNullable(key)
+    if (cfg == null) {
+      missingStep(key)
+    }
+    return cfg
   }
 
   static boolean stepEnabled(String key) {
-    def cfg = stepConfig(key)
+    def cfg = stepConfigNullable(key)
+    if (cfg == null) {
+      missingStep(key)
+    }
     if (cfg.containsKey('enabled') && cfg.enabled == false) {
       return false
     }
     return true
+  }
+
+  private static Map stepConfigNullable(String key) {
+    def all = loadAll()
+    def steps = (all.steps instanceof Map) ? all.steps : [:]
+    if (!steps.containsKey(key)) {
+      return null
+    }
+    def value = steps[key]
+    if (value instanceof Map) {
+      return new LinkedHashMap(value)
+    }
+    return [:]
   }
 
   private static Map deepMerge(Map base, Map override) {
@@ -77,6 +105,54 @@ class ConfigLoader {
       return [:]
     }
     return parseYaml(file)
+  }
+
+  private static void missingStep(String key) {
+    def sources = []
+    def meta = meta()
+    def profiles = meta?.profiles ?: []
+    profiles?.each { file ->
+      if (file instanceof File && file.exists()) {
+        sources << file.path
+      }
+    }
+    if (meta?.base && meta.base.exists()) {
+      sources << meta.base.path
+    }
+    if (meta?.host && meta.host.exists()) {
+      sources << meta.host.path
+    }
+    def hint = sources ? sources.join(', ') : 'no configuration files located'
+    System.err.println("Missing configuration for step '${key}'. Add a '${key}' entry under 'steps' (checked: ${hint}).")
+    System.exit(2)
+  }
+
+  private static List<String> resolveProfileNames() {
+    def raw = System.getenv('CONFIG_PROFILES') ?: ''
+    raw.split(',')
+      .collect { it.trim() }
+      .findAll { it }
+  }
+
+  private static File resolveProfileDir() {
+    def path = System.getenv('CONFIG_PROFILE_DIR')
+    if (path) {
+      return new File(path)
+    }
+    def root = System.getenv('CONFIG_ROOT') ?: '.'
+    return new File(root, 'profiles')
+  }
+
+  private static File profileFile(File dir, String name) {
+    if (name == null || name.trim().isEmpty()) {
+      throw new IllegalArgumentException('Profile name may not be empty')
+    }
+    File direct = new File(dir, name)
+    if (direct.exists() && direct.isFile()) {
+      return direct
+    }
+    File withExt = new File(dir, name.endsWith('.yaml') ? name : name + '.yaml')
+    return withExt
   }
 
   private static Map parseYaml(File file) {
