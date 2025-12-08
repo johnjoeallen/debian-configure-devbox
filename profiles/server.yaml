@@ -31,3 +31,6 @@ steps:
 
   ExtendSuspend:
     enabled: true
+
+  GitPrompt:
+    enabled: true

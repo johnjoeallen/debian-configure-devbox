@@ -98,15 +98,19 @@ if (missing) {
 aliasRequests.each { alias ->
   def sourceCmd = alias.source
   def targetCmd = alias.target
+  def packagePaths = []
+
+  def packageExecutables = sh("dpkg -L ${alias.pkg} 2>/dev/null | grep -E '/s?bin/[^/]+\$'")
+  if (packageExecutables.code == 0 && packageExecutables.out) {
+    packagePaths = packageExecutables.out
+      .split("\\n")
+      .collect { it.trim() }
+      .findAll { it }
+  }
 
   if (!sourceCmd) {
-    def candidateList = sh("dpkg -L ${alias.pkg} 2>/dev/null | grep -E '/s?bin/[^/]+\$'")
-    if (candidateList.code == 0 && candidateList.out) {
-      def basenames = candidateList.out
-        .split("\\n")
-        .collect { it.trim() }
-        .findAll { it }
-        .collect { new File(it).name }
+    if (packagePaths) {
+      def basenames = packagePaths.collect { new File(it).name }
       if (basenames) {
         basenames.sort { a, b -> a.length() <=> b.length() ?: a <=> b }
         sourceCmd = basenames.first()
@@ -124,12 +128,32 @@ aliasRequests.each { alias ->
       System.exit(1)
     }
   }
-  def sourcePathResult = sh("command -v ${sourceCmd}")
-  if (sourcePathResult.code != 0 || !sourcePathResult.out) {
-    System.err.println("Command '${sourceCmd}' not found in PATH after installing ${alias.pkg}; cannot configure alternatives for '${targetCmd}'")
+
+  def sourcePath = null
+  if (sourceCmd?.contains("/")) {
+    sourcePath = sourceCmd
+  }
+  if (!sourcePath && sourceCmd) {
+    def matches = packagePaths.findAll { it.endsWith("/${sourceCmd}") }
+    if (matches) {
+      matches.sort { a, b -> a.length() <=> b.length() ?: a <=> b }
+      sourcePath = matches.first()
+    }
+  }
+  if (!sourcePath && sourceCmd) {
+    def sourcePathResult = sh("command -v ${sourceCmd}")
+    if (sourcePathResult.code == 0 && sourcePathResult.out) {
+      sourcePath = sourcePathResult.out
+    }
+  }
+  if (!sourcePath && packagePaths) {
+    sourcePath = packagePaths.sort { a, b -> a.length() <=> b.length() ?: a <=> b }.first()
+  }
+  if (!sourcePath) {
+    System.err.println("Unable to resolve executable path for '${sourceCmd}' from package '${alias.pkg}'; cannot configure alternatives for '${targetCmd}'")
     System.exit(1)
   }
-  def sourcePath = sourcePathResult.out
+
   def resolvedSource = sh("readlink -f ${sourcePath}")
   if (resolvedSource.code == 0 && resolvedSource.out) {
     sourcePath = resolvedSource.out

@@ -43,3 +43,6 @@ steps:
 
   DockerDataRoot:
     enabled: true
+
+  GitPrompt:
+    enabled: true

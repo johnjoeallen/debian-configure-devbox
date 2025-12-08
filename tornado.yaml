@@ -33,6 +33,12 @@ steps:
       - apt-transport-https
       - neovim alias vim
 
+  GitPrompt:
+    # Configure a Git-aware shell prompt sourced from ~/.bashrc.
+    enabled: true
+    promptFile: ~/.git-prompt.sh
+    bashrcPath: ~/.bashrc
+
   Ntp:
     # Ensure systemd-timesyncd is installed and enabled.
     enabled: true
