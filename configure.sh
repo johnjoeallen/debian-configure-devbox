@@ -172,12 +172,12 @@ stepFiles.each { file ->
   }
   def key = matcher.group(1)
   def entry = steps[key]
+  if (entry == null) {
+    System.err.println("⚠️  Missing configuration for step '${key}'. Assuming disabled.")
+    return
+  }
   if (!(entry instanceof Map)) {
-    if (entry == null) {
-      System.err.println("⚠️  Missing configuration for step '${key}' (expected ${key}).")
-    } else {
-      System.err.println("⚠️  Configuration for step '${key}' should be a mapping (${key}), but found ${entry.getClass().simpleName()} -> ${entry}.")
-    }
+    System.err.println("⚠️  Configuration for step '${key}' should be a mapping (${key}), but found ${entry.getClass().simpleName()} -> ${entry}.")
     failures << key
     return
   }

@@ -3,6 +3,7 @@ package lib
 class ConfigLoader {
   private static Map cachedConfig = null
   private static Map cachedMeta = null
+  private static Set<String> missingWarned = new LinkedHashSet<>()
 
   static Map loadAll() {
     if (cachedConfig != null) {
@@ -37,6 +38,7 @@ class ConfigLoader {
     def cfg = stepConfigNullable(key)
     if (cfg == null) {
       missingStep(key)
+      return [:]
     }
     return cfg
   }
@@ -45,6 +47,7 @@ class ConfigLoader {
     def cfg = stepConfigNullable(key)
     if (cfg == null) {
       missingStep(key)
+      return false
     }
     if (cfg.containsKey('enabled') && cfg.enabled == false) {
       return false
@@ -108,6 +111,10 @@ class ConfigLoader {
   }
 
   private static void missingStep(String key) {
+    if (missingWarned.contains(key)) {
+      return
+    }
+    missingWarned << key
     def sources = []
     def meta = meta()
     def profiles = meta?.profiles ?: []
@@ -123,8 +130,7 @@ class ConfigLoader {
       sources << meta.host.path
     }
     def hint = sources ? sources.join(', ') : 'no configuration files located'
-    System.err.println("Missing configuration for step '${key}'. Add a '${key}' entry under 'steps' (checked: ${hint}).")
-    System.exit(2)
+    System.err.println("⚠️  Missing configuration for step '${key}'. Assuming disabled. Add a '${key}' entry under 'steps' (checked: ${hint}).")
   }
 
   private static List<String> resolveProfileNames() {
