@@ -103,9 +103,6 @@ steps:
     # Install Google Chrome Stable via the Google apt repository.
     enabled: true
 
-  DebianMirror:
-    enabled: false
-
   ExtendSuspend:
     # Ensure the system idle suspend delay is extended.
     enabled: true
