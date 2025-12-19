@@ -14,11 +14,13 @@ steps:
     addCurrentUser: true
     # Additional accounts to add to the admin group.
     users:
-      - jallen
+      - sysadmin
 
   Essentials:
     # Install baseline CLI packages required on all systems.
     packages:
+      # Use "<package> alias <target>" to install a package, remove any package owning the target command, and point update-alternatives at the package's primary binary.
+      # Use "<package> alias <source> -> <target>" to override the source command.
       - curl
       - wget
       - zip
@@ -35,51 +37,13 @@ steps:
     promptFile: ~/.git-prompt.sh
     bashrcPath: ~/.bashrc
 
-  Ntp:
-    # Ensure systemd-timesyncd is installed and enabled.
-    enabled: true
-
-  NisSetup:
-    # Provide a domain to enable NIS provisioning; leave null to skip.
-    domain: dublinux.lan
-    # Either a bare host/IP or a full "ypserver <host>" line.
-    server: 10.0.0.1
-
-  NisServer:
-    # Configure this host as an NIS master.
-    enabled: true
-    domain: dublinux.lan
-    maps:
-      - passwd
-      - group
-
-  Nsswitch:
-    # Ensure NIS entries are present in nsswitch.conf.
-    enabled: true
-
-  PamMkhomedir:
-    # Install and enforce pam_mkhomedir for creating home directories.
-    enabled: true
-
-  DockerInstall:
-    # Install Docker Engine and related tooling from the official repository.
-    enabled: true
-
-  DockerDataRoot:
-    # Override the Docker data-root. Set to null to keep the default location.
-    target: /data/docker
-
-  DockerGroup:
-    # Ensure the current user is a member of the docker group.
-    ensureUser: true
-    # Additional accounts to place in the docker group.
-    users:
-      - jallen
+  SdkmanInstall:
+    # Ensure SDKMAN is present for managing language runtimes.
     enabled: true
 
   SdkmanMavenInstall:
     # Manage Maven installation via SDKMAN.
-    version: null
+    version: 3.9.11
     enabled: true
 
   SdkmanJavaInstall:
@@ -95,13 +59,35 @@ steps:
     # Install the Insomnia API client.
     enabled: true
 
+  GoogleChromeInstall:
+    # Install Google Chrome Stable via the Google apt repository.
+    enabled: false
+
   JetbrainsToolbox:
     # Install JetBrains Toolbox for IDE management.
     enabled: true
 
-  GoogleChromeInstall:
-    # Install Google Chrome Stable via the Google apt repository.
+  DebianMirror:
+    # Configure and serve a local Debian apt mirror via Apache.
     enabled: true
+    siteFqdn: mirror.dublinux.lan
+    mirrorRoot: /data/mirrors
+    distributions:
+      - bookworm
+      - trixie
+    components:
+      - main
+      - contrib
+      - non-free
+      - non-free-firmware
+    includeUpdates: true
+    includeBackports: true
+    securitySuites:
+      - bookworm-security
+      - trixie-security
+    threads: 20
+    runInitialSync: true
+    cronEnabled: true
 
   ExtendSuspend:
     # Ensure the system idle suspend delay is extended.
