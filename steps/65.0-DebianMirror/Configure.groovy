@@ -21,7 +21,7 @@ if (!ConfigLoader.stepEnabled(stepKey)) {
 }
 
 Map cfg = ConfigLoader.stepConfig(stepKey)
-String siteFqdn = (cfg.siteFqdn ?: "mirror.dublinux.net") as String
+String siteFqdn = (cfg.siteFqdn ?: "mirror.dublinux.lan") as String
 String mirrorRoot = (cfg.mirrorRoot ?: "/var/ftp/pub/mirrors") as String
 String mainBase = (cfg.mainBase ?: "${mirrorRoot}/debian") as String
 String securityBase = (cfg.securityBase ?: "${mirrorRoot}/debian-security") as String

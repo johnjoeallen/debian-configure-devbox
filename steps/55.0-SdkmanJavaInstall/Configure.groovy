@@ -3,15 +3,11 @@
 // --- Documentation ---
 // Summary: Install and set default Java runtimes via SDKMAN according to config.
 // Config keys: javaVersions (list), javaVersion (string, legacy), defaultJava (string)
-// Notes: Requires SdkmanInstall and skips when SDKMAN is missing.
+// Notes: Skips when SDKMAN is missing.
 
 import lib.ConfigLoader
 import static lib.StepUtils.sh
 
-if (!ConfigLoader.stepEnabled("SdkmanInstall")) {
-  println "SdkmanInstall disabled; skipping Java installs."
-  System.exit(0)
-}
 def stepKey = "SdkmanJavaInstall"
 if (!ConfigLoader.stepEnabled(stepKey)) {
   println "${stepKey} disabled via configuration"

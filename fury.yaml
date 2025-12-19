@@ -41,7 +41,7 @@ steps:
 
   NisSetup:
     # Provide a domain to enable NIS provisioning; leave null to skip.
-    domain: dublinux.net
+    domain: dublinux.lab
     # Either a bare host/IP or a full "ypserver <host>" line.
     server: 10.0.0.1
 
@@ -67,10 +67,6 @@ steps:
     # Additional accounts to place in the docker group.
     users:
       - jallen
-    enabled: true
-
-  SdkmanInstall:
-    # Ensure SDKMAN is present for managing language runtimes.
     enabled: true
 
   SdkmanMavenInstall:

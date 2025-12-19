@@ -101,15 +101,96 @@ SUDO_PREFIX=()
 if [[ "$IS_ROOT" -eq 0 ]]; then
   SUDO_PREFIX=(sudo)
 fi
-if ! command -v groovy >/dev/null 2>&1; then
-  echo "📦 Groovy not found. Installing..."
-  "${SUDO_PREFIX[@]}" apt update -y
-  "${SUDO_PREFIX[@]}" apt install -y groovy
-  echo "✅ Installed: $(groovy -version 2>&1)"
+SDKMAN_DIR="${SDKMAN_DIR:-$HOME/.sdkman}"
+SDKMAN_INIT="${SDKMAN_DIR}/bin/sdkman-init.sh"
+BOOTSTRAP_JAVA_VERSION="${BOOTSTRAP_JAVA_VERSION:-21.0.9-tem}"
+BOOTSTRAP_GROOVY_VERSION="${BOOTSTRAP_GROOVY_VERSION:-4.0.21}"
+MIN_GROOVY_VERSION="${MIN_GROOVY_VERSION:-4.0.21}"
+ensure_sdkman() {
+  if [[ -f "$SDKMAN_INIT" ]]; then
+    return 0
+  fi
+  echo "📦 SDKMAN not found. Installing..."
+  if ! bash -lc "export SDKMAN_DIR='${SDKMAN_DIR}'; export SDKMAN_NON_INTERACTIVE=true; curl -s 'https://get.sdkman.io' | bash"; then
+    echo "❌ Failed to install SDKMAN." >&2
+    exit 1
+  fi
+}
+
+version_ge() {
+  local a="$1"
+  local b="$2"
+  [[ "$(printf '%s\n' "$b" "$a" | sort -V | head -n1)" == "$b" ]]
+}
+
+groovy_version_from_bin() {
+  local bin="$1"
+  local raw
+  raw="$("$bin" -version 2>&1 | head -n1 || true)"
+  if [[ "$raw" =~ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+  fi
+}
+
+sdkman_groovy="${SDKMAN_DIR}/candidates/groovy/current/bin/groovy"
+GROOVY_BIN=""
+if [[ -x "$sdkman_groovy" ]]; then
+  GROOVY_BIN="$sdkman_groovy"
 else
-  echo "✅ Groovy present: $(groovy -version 2>&1)"
+  GROOVY_BIN="$(command -v groovy || true)"
 fi
-GROOVY_BIN="$(command -v groovy)"
+
+groovy_version=""
+if [[ -n "$GROOVY_BIN" ]]; then
+  groovy_version="$(groovy_version_from_bin "$GROOVY_BIN")"
+fi
+
+if [[ -z "$GROOVY_BIN" || -z "$groovy_version" || ! $(version_ge "$groovy_version" "$MIN_GROOVY_VERSION") ]]; then
+  ensure_sdkman
+  echo "📦 Installing Groovy via SDKMAN..."
+  if ! bash -lc "source '${SDKMAN_INIT}' && sdk install groovy ${BOOTSTRAP_GROOVY_VERSION} && sdk default groovy ${BOOTSTRAP_GROOVY_VERSION}"; then
+    echo "❌ Failed to install Groovy ${BOOTSTRAP_GROOVY_VERSION} via SDKMAN." >&2
+    exit 1
+  fi
+  GROOVY_BIN="${SDKMAN_DIR}/candidates/groovy/current/bin/groovy"
+fi
+GROOVY_JAVA_HOME="${GROOVY_JAVA_HOME:-${JAVA_HOME:-}}"
+sdkman_java="${SDKMAN_DIR}/candidates/java/current"
+if [[ -x "${sdkman_java}/bin/java" ]]; then
+  GROOVY_JAVA_HOME="$sdkman_java"
+fi
+if [[ -n "$GROOVY_JAVA_HOME" && ! -x "$GROOVY_JAVA_HOME/bin/java" ]]; then
+  echo "⚠️  JAVA_HOME points to an invalid JVM (${GROOVY_JAVA_HOME}); ignoring for Groovy." >&2
+  GROOVY_JAVA_HOME=""
+fi
+if [[ -z "$GROOVY_JAVA_HOME" ]]; then
+  java_bin="$(command -v java || true)"
+  if [[ -n "$java_bin" ]]; then
+    java_home_resolved="$(readlink -f "$java_bin" 2>/dev/null || true)"
+    if [[ -n "$java_home_resolved" ]]; then
+      java_home_resolved="$(dirname "$(dirname "$java_home_resolved")")"
+      if [[ -x "$java_home_resolved/bin/java" ]]; then
+        GROOVY_JAVA_HOME="$java_home_resolved"
+      fi
+    fi
+  fi
+fi
+if [[ -z "$GROOVY_JAVA_HOME" ]]; then
+  ensure_sdkman
+  echo "📦 Installing Java via SDKMAN..."
+  if ! bash -lc "source '${SDKMAN_INIT}' && sdk install java ${BOOTSTRAP_JAVA_VERSION}"; then
+    echo "❌ Failed to install Java ${BOOTSTRAP_JAVA_VERSION} via SDKMAN." >&2
+    exit 1
+  fi
+  if [[ -x "${SDKMAN_DIR}/candidates/java/current/bin/java" ]]; then
+    GROOVY_JAVA_HOME="${SDKMAN_DIR}/candidates/java/current"
+  fi
+fi
+GROOVY_ENV=()
+if [[ -n "$GROOVY_JAVA_HOME" ]]; then
+  GROOVY_ENV=(env JAVA_HOME="$GROOVY_JAVA_HOME")
+fi
+echo "✅ Groovy present: $(${GROOVY_ENV[@]} "$GROOVY_BIN" -version 2>&1)"
 echo "==> Running provision steps from: $STEPS_DIR"
 echo "    Exit codes: 0=NOOP, 10=CHANGED (pause), 1-9=ERROR (pause)"
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -204,7 +285,7 @@ if [[ -z "$validator_tmpdir" || ! -d "$validator_tmpdir" ]]; then
   exit 1
 fi
 
-if ! "$GROOVY_BIN" "-Dgroovy.target.directory=$validator_tmpdir" "$validator_script" "${STEP_FILES[@]}"; then
+if ! "${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$validator_tmpdir" "$validator_script" "${STEP_FILES[@]}"; then
   rm -rf "$validator_tmpdir"
   rm -f "$validator_script"
   echo "❌ Step configuration validation failed. Resolve the warnings above before rerunning." >&2
@@ -250,12 +331,12 @@ for step in "${STEP_FILES[@]}"; do
   fi
   export GROOVY_TARGET_DIR="$step_tmpdir"
   if [[ "$requires_user_context" -eq 1 ]]; then
-    runner=("$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+    runner=("${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
   else
     if [[ "$IS_ROOT" -eq 1 ]]; then
-      runner=("$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+      runner=("${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
     else
-      runner=(sudo -E "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+      runner=(sudo -E "${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
     fi
   fi
   set +e

@@ -73,10 +73,6 @@ steps:
       - jallen
     enabled: true
 
-  SdkmanInstall:
-    # Ensure SDKMAN is present for managing language runtimes.
-    enabled: true
-
   SdkmanMavenInstall:
     # Manage Maven installation via SDKMAN.
     version: null

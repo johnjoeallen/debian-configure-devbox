@@ -14,13 +14,11 @@ steps:
     addCurrentUser: true
     # Additional accounts to add to the admin group.
     users:
-      - admin
+      - jallen
 
   Essentials:
     # Install baseline CLI packages required on all systems.
     packages:
-      # Use "<package> alias <target>" to install a package, remove any package owning the target command, and point update-alternatives at the package's primary binary.
-      # Use "<package> alias <source> -> <target>" to override the source command.
       - curl
       - wget
       - zip
@@ -43,13 +41,14 @@ steps:
 
   NisSetup:
     # Provide a domain to enable NIS provisioning; leave null to skip.
-    domain:
+    domain: dublinux.lan
     # Either a bare host/IP or a full "ypserver <host>" line.
-    server:
+    server: 10.0.0.1
 
   NisServer:
-    # Configure this host as an NIS master; leave null to skip.
-    domain:
+    # Configure this host as an NIS master.
+    enabled: true
+    domain: dublinux.lan
     maps:
       - passwd
       - group
@@ -74,12 +73,13 @@ steps:
     # Ensure the current user is a member of the docker group.
     ensureUser: true
     # Additional accounts to place in the docker group.
-    users: []
+    users:
+      - jallen
     enabled: true
 
   SdkmanMavenInstall:
     # Manage Maven installation via SDKMAN.
-    version: 3.9.11
+    version: null
     enabled: true
 
   SdkmanJavaInstall:
@@ -95,35 +95,13 @@ steps:
     # Install the Insomnia API client.
     enabled: true
 
-  GoogleChromeInstall:
-    # Install Google Chrome Stable via the Google apt repository.
-    enabled: false
-
   JetbrainsToolbox:
     # Install JetBrains Toolbox for IDE management.
     enabled: true
 
-  DebianMirror:
-    # Configure and serve a local Debian apt mirror via Apache.
-    enabled: false
-    siteFqdn: mirror.dublinux.lan
-    mirrorRoot: /var/ftp/pub/mirrors
-    distributions:
-      - bookworm
-      - trixie
-    components:
-      - main
-      - contrib
-      - non-free
-      - non-free-firmware
-    includeUpdates: true
-    includeBackports: true
-    securitySuites:
-      - bookworm-security
-      - trixie-security
-    threads: 20
-    runInitialSync: true
-    cronEnabled: true
+  GoogleChromeInstall:
+    # Install Google Chrome Stable via the Google apt repository.
+    enabled: true
 
   ExtendSuspend:
     # Ensure the system idle suspend delay is extended.

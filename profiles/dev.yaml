@@ -23,9 +23,6 @@ steps:
   Insomnia:
     enabled: true
 
-  SdkmanInstall:
-    enabled: true
-
   SdkmanJavaInstall:
     enabled: true
 
