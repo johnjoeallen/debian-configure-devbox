@@ -5,6 +5,8 @@ usage() {
   cat <<USAGE
 Usage: ./configure.sh [--profiles=NAME[,NAME...]]
        ./configure.sh [--profiles NAME[,NAME...]]
+       ./configure.sh [--steps=STEP_KEY[,STEP_KEY...]]
+       ./configure.sh [--steps STEP_KEY[,STEP_KEY...]]
        ./configure.sh [--root-only]
 
 Profiles are resolved under \"profiles/\" (overridable with CONFIG_PROFILE_DIR).
@@ -15,6 +17,7 @@ USAGE
 }
 
 declare -a PROFILE_NAMES=()
+declare -a STEP_KEYS=()
 ROOT_ONLY=0
 
 parse_profiles() {
@@ -24,6 +27,17 @@ parse_profiles() {
     local name=${raw// /}
     if [[ -n "$name" ]]; then
       PROFILE_NAMES+=("$name")
+    fi
+  done
+}
+
+parse_steps() {
+  local csv=$1
+  local IFS=','
+  for raw in $csv; do
+    local name=${raw// /}
+    if [[ -n "$name" ]]; then
+      STEP_KEYS+=("$name")
     fi
   done
 }
@@ -41,6 +55,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --profiles=*)
       parse_profiles "${1#*=}"
+      ;;
+    --steps)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --steps" >&2
+        usage
+        exit 1
+      fi
+      shift
+      parse_steps "$1"
+      ;;
+    --steps=*)
+      parse_steps "${1#*=}"
       ;;
     --root-only)
       ROOT_ONLY=1
@@ -65,6 +91,12 @@ CONFIG_FILE="${CONFIG_FILE:-$CONFIG_ROOT/config.yaml}"
 HOST_ID_SHORT="${CONFIG_HOSTNAME:-$(hostname -s 2>/dev/null || hostname || echo unknown)}"
 HOST_CONFIG_FILE="${CONFIG_HOST_FILE:-$CONFIG_ROOT/${HOST_ID_SHORT}.yaml}"
 PROFILE_DIR="${CONFIG_PROFILE_DIR:-$CONFIG_ROOT/profiles}"
+SNAKEYAML_VERSION="${SNAKEYAML_VERSION:-2.2}"
+SNAKEYAML_JAR="${ROOT_DIR}/lib/snakeyaml-${SNAKEYAML_VERSION}.jar"
+GROOVY_CLASSPATH="${ROOT_DIR}:${ROOT_DIR}/lib/*"
+if [[ -n "${CLASSPATH:-}" ]]; then
+  GROOVY_CLASSPATH="${GROOVY_CLASSPATH}:${CLASSPATH}"
+fi
 
 if [[ ${#PROFILE_NAMES[@]} -gt 0 ]]; then
   for profile in "${PROFILE_NAMES[@]}"; do
@@ -131,6 +163,17 @@ ensure_sdkman() {
   fi
 }
 
+ensure_snakeyaml() {
+  if [[ -f "$SNAKEYAML_JAR" ]]; then
+    return 0
+  fi
+  echo "📦 Downloading SnakeYAML ${SNAKEYAML_VERSION}..."
+  if ! curl -fsSL -o "$SNAKEYAML_JAR" "https://repo1.maven.org/maven2/org/yaml/snakeyaml/${SNAKEYAML_VERSION}/snakeyaml-${SNAKEYAML_VERSION}.jar"; then
+    echo "❌ Failed to download SnakeYAML (${SNAKEYAML_VERSION})." >&2
+    exit 1
+  fi
+}
+
 version_ge() {
   local a="$1"
   local b="$2"
@@ -168,6 +211,7 @@ if [[ -z "$GROOVY_BIN" || -z "$groovy_version" || ! $(version_ge "$groovy_versio
   fi
   GROOVY_BIN="${SDKMAN_DIR}/candidates/groovy/current/bin/groovy"
 fi
+ensure_snakeyaml
 GROOVY_JAVA_HOME="${GROOVY_JAVA_HOME:-${JAVA_HOME:-}}"
 sdkman_java="${SDKMAN_DIR}/candidates/java/current"
 if [[ -x "${sdkman_java}/bin/java" ]]; then
@@ -200,9 +244,9 @@ if [[ -z "$GROOVY_JAVA_HOME" ]]; then
     GROOVY_JAVA_HOME="${SDKMAN_DIR}/candidates/java/current"
   fi
 fi
-GROOVY_ENV=()
+GROOVY_ENV=(env CLASSPATH="$GROOVY_CLASSPATH")
 if [[ -n "$GROOVY_JAVA_HOME" ]]; then
-  GROOVY_ENV=(env JAVA_HOME="$GROOVY_JAVA_HOME")
+  GROOVY_ENV=(env JAVA_HOME="$GROOVY_JAVA_HOME" CLASSPATH="$GROOVY_CLASSPATH")
 fi
 echo "✅ Groovy present: $(${GROOVY_ENV[@]} "$GROOVY_BIN" -version 2>&1)"
 echo "==> Running provision steps from: $STEPS_DIR"
@@ -221,6 +265,9 @@ if [[ ${#PROFILE_NAMES[@]} -gt 0 ]]; then
   echo "    Profiles: ${PROFILE_NAMES[*]} (dir: $PROFILE_DIR)"
 else
   echo "    Profiles: (none)"
+fi
+if [[ ${#STEP_KEYS[@]} -gt 0 ]]; then
+  echo "    Steps: ${STEP_KEYS[*]}"
 fi
 if [[ "$ROOT_ONLY" -eq 1 ]]; then
   echo "    Mode: root-only (user-context steps disabled)"
@@ -282,6 +329,33 @@ fi
 for i in "${!STEP_FILES[@]}"; do
   STEP_FILES[$i]="${STEP_FILES[$i]%$'\n'}"
 done
+
+if [[ ${#STEP_KEYS[@]} -gt 0 ]]; then
+  declare -A STEP_KEY_SET=()
+  for key in "${STEP_KEYS[@]}"; do
+    STEP_KEY_SET["$key"]=1
+  done
+  filtered_steps=()
+  found_keys=()
+  for step in "${STEP_FILES[@]}"; do
+    step_key="$(sed -nE "s/.*\\bstepKey\\b\\s*=\\s*['\"]([^'\"]+)['\"].*/\\1/p" "$step" | head -n1 || true)"
+    if [[ -n "$step_key" && -n "${STEP_KEY_SET[$step_key]:-}" ]]; then
+      filtered_steps+=("$step")
+      found_keys+=("$step_key")
+    fi
+  done
+  missing_keys=()
+  for key in "${STEP_KEYS[@]}"; do
+    if [[ ! " ${found_keys[*]} " =~ " ${key} " ]]; then
+      missing_keys+=("$key")
+    fi
+  done
+  if [[ ${#missing_keys[@]} -gt 0 ]]; then
+    echo "❌ Step key(s) not found: ${missing_keys[*]}" >&2
+    exit 1
+  fi
+  STEP_FILES=("${filtered_steps[@]}")
+fi
 
 skipped_root_pre_nsswitch=()
 skipped_user_steps=()

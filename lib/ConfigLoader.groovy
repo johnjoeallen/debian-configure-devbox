@@ -1,5 +1,9 @@
 package lib
 
+import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.LoaderOptions
+import org.yaml.snakeyaml.constructor.SafeConstructor
+
 class ConfigLoader {
   private static Map cachedConfig = null
   private static Map cachedMeta = null
@@ -194,127 +198,16 @@ class ConfigLoader {
   }
 
   private static Map parseYaml(File file) {
-    def lines = file.readLines()
-    def root = [:]
-    def stack = [[indent:-1, container:root, type:'map']]
-
-    def nextNonEmpty = { int start ->
-      for (int i = start; i < lines.size(); i++) {
-        def candidate = stripComment(lines[i].replace('\t', '    '))
-        if (candidate.trim()) {
-          return candidate.trim()
-        }
-      }
-      return null
+    def options = new LoaderOptions()
+    def yaml = new Yaml(new SafeConstructor(options))
+    def data = yaml.load(file.getText('UTF-8'))
+    if (data == null) {
+      return [:]
     }
-
-    for (int idx = 0; idx < lines.size(); idx++) {
-      def rawLine = lines[idx]
-      def line = rawLine.replace('\t', '    ')
-      def stripped = stripComment(line)
-      if (!stripped.trim()) {
-        continue
-      }
-      int indent = leadingSpaces(stripped)
-      String trimmed = stripped.trim()
-
-      while (stack.size() > 1 && indent <= stack[-1].indent) {
-        stack.remove(stack.size()-1)
-      }
-      def frame = stack[-1]
-
-      if (trimmed.startsWith('- ')) {
-        if (frame.type != 'list') {
-          throw new IllegalArgumentException("List item without list parent: ${rawLine}")
-        }
-        def valueText = trimmed.substring(2).trim()
-        if (!valueText) {
-          def newMap = [:]
-          frame.container << newMap
-          stack << [indent:indent, container:newMap, type:'map']
-        } else {
-          frame.container << parseScalar(valueText)
-        }
-        continue
-      }
-
-      def parts = trimmed.split(':', 2)
-      if (parts.length < 2) {
-        throw new IllegalArgumentException("Unsupported YAML line: ${rawLine}")
-      }
-      def key = parts[0].trim()
-      def valuePart = parts[1].trim()
-
-      if (valuePart.isEmpty()) {
-        def lookahead = nextNonEmpty(idx + 1)
-        boolean expectList = (lookahead != null && lookahead.startsWith('- '))
-        if (expectList) {
-          def list = []
-          frame.container[key] = list
-          stack << [indent:indent, container:list, type:'list']
-        } else {
-          def newMap = [:]
-          frame.container[key] = newMap
-          stack << [indent:indent, container:newMap, type:'map']
-        }
-      } else {
-        def value = parseScalar(valuePart)
-        frame.container[key] = value
-      }
+    if (!(data instanceof Map)) {
+      throw new IllegalArgumentException("Root of ${file.path} must be a mapping, got ${data.getClass().simpleName()}")
     }
-    return root
-  }
-
-  private static String stripComment(String line) {
-    boolean inSingle = false
-    boolean inDouble = false
-    StringBuilder sb = new StringBuilder()
-    for (int i = 0; i < line.length(); i++) {
-      char ch = line.charAt(i)
-      if (ch == '"' && !inSingle) {
-        inDouble = !inDouble
-      } else if (ch == '\'' && !inDouble) {
-        inSingle = !inSingle
-      }
-      if (!inSingle && !inDouble && ch == '#') {
-        break
-      }
-      sb.append(ch)
-    }
-    return sb.toString()
-  }
-
-  private static int leadingSpaces(String line) {
-    int count = 0
-    while (count < line.length() && Character.isWhitespace(line.charAt(count))) {
-      count++
-    }
-    return count
-  }
-
-  private static Object parseScalar(String value) {
-    def text = value.trim()
-    if (text.equalsIgnoreCase('null') || text == '~') {
-      return null
-    }
-    if (text.equalsIgnoreCase('true')) {
-      return true
-    }
-    if (text.equalsIgnoreCase('false')) {
-      return false
-    }
-    if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith('\'') && text.endsWith('\''))) {
-      return text.substring(1, text.length()-1)
-    }
-    if (text.isNumber()) {
-      if (text.contains('.') || text.contains('e') || text.contains('E')) {
-        return Double.parseDouble(text)
-      }
-      try {
-        return Long.parseLong(text)
-      } catch (NumberFormatException ignore) {}
-    }
-    return text
+    return (Map) data
   }
 
   private static File resolveBaseFile() {

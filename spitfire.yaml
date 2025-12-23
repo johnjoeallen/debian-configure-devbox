@@ -96,3 +96,73 @@ steps:
   NvidiaDriverInstall:
     # Install NVIDIA drivers for Debian 13 using the Groovy runbook step.
     enabled: true
+
+  SambaShares:
+    # Configure Samba shares (standalone, share-level access).
+    enabled: true
+    workgroup: DUBLINUX
+    sambaUsers:
+      - user:
+          name: callen
+      - user:
+          name: jallen
+      - user:
+          name: lredford
+      - user:
+          name: mallen
+      - user:
+          name: rallen
+    shares:
+      - share:
+          name: callen
+          path: /data/share/callen
+          browseable: true
+          readOnly: false
+          validUsers:
+            - callen
+          forceUser: callen
+          forceGroup: users
+      - share:
+          name: jallen
+          path: /data/share/jallen
+          browseable: true
+          readOnly: false
+          validUsers:
+            - jallen
+          forceUser: jallen
+          forceGroup: users
+      - share:
+          name: lredford
+          path: /data/share/lredford
+          browseable: true
+          readOnly: false
+          validUsers:
+            - lredford
+          forceUser: lredford
+          forceGroup: users
+      - share:
+          name: mallen
+          path: /data/share/mallen
+          browseable: true
+          readOnly: false
+          validUsers:
+            - mallen
+          forceUser: mallen
+          forceGroup: users
+      - share:
+          name: rallen
+          path: /data/share/rallen
+          browseable: true
+          readOnly: false
+          validUsers:
+            - rallen
+          forceUser: rallen
+          forceGroup: users
+
+  EspReplicate:
+    # Replicate the EFI System Partition and install GRUB on matching disks.
+    # Use true to apply, false to skip, or info to display planned actions only.
+    enabled: true
+    bootloaderId: debian
+    autoApprove: false
+    
