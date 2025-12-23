@@ -465,12 +465,7 @@ for step in "${STEP_FILES[@]}"; do
     step_is_nsswitch=1
   fi
   if [[ "$IS_ROOT" -eq 0 && "$requires_root_context" -eq 1 && "$nsswitch_ready" -eq 0 && "$requires_sudo_context" -eq 0 ]]; then
-    echo "→ Skipping (requires root before Nsswitch completes)."
-    skipped_root_pre_nsswitch+=("$rel_path")
-    if [[ "$step_is_nsswitch" -eq 1 ]]; then
-      nsswitch_ready=1
-    fi
-    continue
+    echo "→ Verifying (pre-Nsswitch root step; may apply changes)."
   fi
   if [[ "$requires_user_context" -eq 1 && "$IS_ROOT" -eq 1 ]]; then
     echo "→ Skipping (requires non-root user context)."
