@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-// RUN_AS_ROOT
+// RUN_VIA_SUDO
 // --- Documentation ---
 // Summary: Install the Insomnia desktop client at a pinned version.
 // Config keys: none

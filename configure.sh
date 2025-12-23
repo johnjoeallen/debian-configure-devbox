@@ -5,12 +5,17 @@ usage() {
   cat <<USAGE
 Usage: ./configure.sh [--profiles=NAME[,NAME...]]
        ./configure.sh [--profiles NAME[,NAME...]]
+       ./configure.sh [--root-only]
 
 Profiles are resolved under \"profiles/\" (overridable with CONFIG_PROFILE_DIR).
+Recommended flow:
+  1) Run once as root to configure prerequisites.
+  2) Run again as your normal user for user-context steps.
 USAGE
 }
 
 declare -a PROFILE_NAMES=()
+ROOT_ONLY=0
 
 parse_profiles() {
   local csv=$1
@@ -36,6 +41,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --profiles=*)
       parse_profiles "${1#*=}"
+      ;;
+    --root-only)
+      ROOT_ONLY=1
       ;;
     -h|--help)
       usage
@@ -81,6 +89,8 @@ CURRENT_USER="$(id -un)"
 IS_ROOT=0
 if [[ "$CURRENT_USER" == "root" ]]; then
   IS_ROOT=1
+  ROOT_ONLY=1
+  echo "ℹ️  Running as root enables root-only mode; rerun as a normal user to apply user-context steps."
 else
   if ! id -nG "$CURRENT_USER" | tr ' ' '\n' | grep -Eq '^(sudo|wheel|admin)$'; then
     cat <<EOF
@@ -96,6 +106,10 @@ After configure completes log out/in so your new admin group membership (added a
 EOF
     exit 1
   fi
+fi
+if [[ "$ROOT_ONLY" -eq 1 && "$IS_ROOT" -eq 0 ]]; then
+  echo "❌ --root-only requires running as root." >&2
+  exit 1
 fi
 SUDO_PREFIX=()
 if [[ "$IS_ROOT" -eq 0 ]]; then
@@ -208,11 +222,55 @@ if [[ ${#PROFILE_NAMES[@]} -gt 0 ]]; then
 else
   echo "    Profiles: (none)"
 fi
+if [[ "$ROOT_ONLY" -eq 1 ]]; then
+  echo "    Mode: root-only (user-context steps disabled)"
+fi
 
 if [[ ! -f "$CONFIG_FILE" && ! -f "$HOST_CONFIG_FILE" ]]; then
   template_hint="$CONFIG_ROOT/config-template.yaml"
   echo "⚠️  No configuration files found. Copy \"${template_hint}\" to config.yaml or ${HOST_ID_SHORT}.yaml before running." >&2
   exit 1
+fi
+
+user_list_script="$(mktemp)"
+cat <<'EOF' >"$user_list_script"
+#!/usr/bin/env groovy
+import lib.ConfigLoader
+
+def cfg = ConfigLoader.loadAll()
+def raw = cfg.userStepUsers
+def names = []
+if (raw instanceof Collection) {
+  raw.each { entry ->
+    def text = entry?.toString()?.trim()
+    if (text) {
+      names << text
+    }
+  }
+} else if (raw != null) {
+  raw.toString().split(',')
+    .collect { it.trim() }
+    .findAll { it }
+    .each { names << it }
+}
+println names.join(',')
+EOF
+chmod +x "$user_list_script"
+
+user_list_tmpdir="$(mktemp -d 2>/dev/null || true)"
+USER_STEP_USERS=""
+if [[ -n "$user_list_tmpdir" && -d "$user_list_tmpdir" ]]; then
+  if USER_STEP_USERS=$("${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$user_list_tmpdir" "$user_list_script"); then
+    :
+  else
+    USER_STEP_USERS=""
+  fi
+  rm -rf "$user_list_tmpdir" 2>/dev/null || true
+fi
+rm -f "$user_list_script"
+
+if [[ -n "$USER_STEP_USERS" ]]; then
+  echo "    User-step allowlist: $USER_STEP_USERS"
 fi
 readarray -d '' STEP_FILES < <(find "$STEPS_DIR" -mindepth 1 -maxdepth 2 -type f -name '*.groovy' -print0 | sort -z)
 
@@ -227,6 +285,7 @@ done
 
 skipped_root_pre_nsswitch=()
 skipped_user_steps=()
+skipped_root_only_steps=()
 nsswitch_ready=0
 
 validator_script="$(mktemp)"
@@ -245,15 +304,22 @@ stepFiles.each { file ->
     failures << file.absolutePath
     return
   }
-  def matcher = (file.getText('UTF-8') =~ /\bstepKey\b\s*=\s*[\"']([^\"']+)[\"']/)
+  def text = file.getText('UTF-8')
+  def matcher = (text =~ /\bstepKey\b\s*=\s*[\"']([^\"']+)[\"']/)
   if (!matcher.find()) {
     System.err.println("⚠️  Unable to determine step key for ${file}")
     failures << file.absolutePath
     return
   }
   def key = matcher.group(1)
+  def isPrereq = (text =~ /\bPREREQ_ROOT\b/).find()
   def entry = steps[key]
   if (entry == null) {
+    if (isPrereq) {
+      System.err.println("❌ Prerequisite step '${key}' is missing from configuration.")
+      failures << key
+      return
+    }
     System.err.println("⚠️  Missing configuration for step '${key}'. Assuming disabled.")
     return
   }
@@ -265,6 +331,11 @@ stepFiles.each { file ->
   boolean enabled = true
   if (entry.containsKey('enabled')) {
     enabled = entry.enabled != false
+  }
+  if (isPrereq && !enabled) {
+    System.err.println("❌ Prerequisite step '${key}' is disabled in configuration.")
+    failures << key
+    return
   }
   if (!enabled) {
     return
@@ -303,15 +374,23 @@ for step in "${STEP_FILES[@]}"; do
   echo
   echo "[$step_index] === $rel_path ==="
   requires_user_context=0
+  requires_sudo_context=0
   if grep -qE '^[[:space:]]*//[[:space:]]*RUN_AS_USER' "$step"; then
     requires_user_context=1
+  fi
+  if grep -qE '^[[:space:]]*//[[:space:]]*RUN_VIA_SUDO' "$step"; then
+    requires_sudo_context=1
+  fi
+  if [[ "$requires_user_context" -eq 1 && "$requires_sudo_context" -eq 1 ]]; then
+    echo "→ ERROR (step cannot declare both RUN_AS_USER and RUN_VIA_SUDO)."
+    exit 1
   fi
   requires_root_context=$((requires_user_context == 0 ? 1 : 0))
   step_is_nsswitch=0
   if [[ "$rel_path" == *"/Nsswitch/"* ]] || [[ "$rel_path" == 25.0-Nsswitch* ]]; then
     step_is_nsswitch=1
   fi
-  if [[ "$IS_ROOT" -eq 0 && "$requires_root_context" -eq 1 && "$nsswitch_ready" -eq 0 ]]; then
+  if [[ "$IS_ROOT" -eq 0 && "$requires_root_context" -eq 1 && "$nsswitch_ready" -eq 0 && "$requires_sudo_context" -eq 0 ]]; then
     echo "→ Skipping (requires root before Nsswitch completes)."
     skipped_root_pre_nsswitch+=("$rel_path")
     if [[ "$step_is_nsswitch" -eq 1 ]]; then
@@ -324,6 +403,26 @@ for step in "${STEP_FILES[@]}"; do
     skipped_user_steps+=("$rel_path")
     continue
   fi
+  if [[ "$ROOT_ONLY" -eq 1 && ( "$requires_user_context" -eq 1 || "$requires_sudo_context" -eq 1 ) ]]; then
+    echo "→ Skipping (root-only mode)."
+    skipped_root_only_steps+=("$rel_path")
+    continue
+  fi
+  if [[ "$requires_user_context" -eq 1 && -n "$USER_STEP_USERS" ]]; then
+    allowed=0
+    IFS=',' read -r -a allowed_users <<<"$USER_STEP_USERS"
+    for allowed_user in "${allowed_users[@]}"; do
+      if [[ "$allowed_user" == "$CURRENT_USER" ]]; then
+        allowed=1
+        break
+      fi
+    done
+    if [[ "$allowed" -eq 0 ]]; then
+      echo "→ Skipping (user '${CURRENT_USER}' not in allowlist)."
+      skipped_user_steps+=("$rel_path")
+      continue
+    fi
+  fi
   step_tmpdir="$(mktemp -d 2>/dev/null || true)"
   if [[ -z "$step_tmpdir" || ! -d "$step_tmpdir" ]]; then
     echo "⚠️  Unable to create temporary directory for ${rel_path}" >&2
@@ -333,10 +432,18 @@ for step in "${STEP_FILES[@]}"; do
   if [[ "$requires_user_context" -eq 1 ]]; then
     runner=("${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
   else
-    if [[ "$IS_ROOT" -eq 1 ]]; then
-      runner=("${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+    if [[ "$requires_sudo_context" -eq 1 ]]; then
+      if [[ "$IS_ROOT" -eq 1 ]]; then
+        runner=("${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+      else
+        runner=(sudo -E "${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+      fi
     else
-      runner=(sudo -E "${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+      if [[ "$IS_ROOT" -eq 1 ]]; then
+        runner=("${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+      else
+        runner=(sudo -E "${GROOVY_ENV[@]}" "$GROOVY_BIN" "-Dgroovy.target.directory=$GROOVY_TARGET_DIR" "$step")
+      fi
     fi
   fi
   set +e
@@ -371,6 +478,9 @@ if [[ "${#skipped_root_pre_nsswitch[@]}" -gt 0 ]]; then
 fi
 if [[ "${#skipped_user_steps[@]}" -gt 0 ]]; then
   printf 'ℹ️  Skipped user-context steps (rerun as non-root with sudo): %s\n' "${skipped_user_steps[*]}"
+fi
+if [[ "${#skipped_root_only_steps[@]}" -gt 0 ]]; then
+  printf 'ℹ️  Skipped steps due to --root-only: %s\n' "${skipped_root_only_steps[*]}"
 fi
 echo
 echo "✅ All steps processed."

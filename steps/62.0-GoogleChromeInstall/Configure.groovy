@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-// RUN_AS_ROOT
+// RUN_VIA_SUDO
 // --- Documentation ---
 // Summary: Install Google Chrome Stable from Google's apt repository.
 // Config keys: GoogleChromeInstall (map)

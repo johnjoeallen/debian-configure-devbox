@@ -12,5 +12,5 @@ Extends the system idle suspend timeout by managing a systemd-logind drop-in con
 
 ## Configuration
 - `idleAction`: Logind idle action to apply (for example `suspend`).
-- `timeout`: Idle timeout in ISO-8601 duration format such as `PT1H`.
+- `timeout`: Idle timeout in ISO-8601 duration format such as `PT1H`. Use `OFF` or `INF` to disable idle suspend.
 - `timeoutSeconds`: Legacy numeric timeout value used when `timeout` is not provided.

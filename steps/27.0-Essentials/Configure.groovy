@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-// RUN_AS_ROOT
+// RUN_VIA_SUDO
 // --- Documentation ---
 // Summary: Install baseline CLI packages required for provisioning.
 // Config keys: packages (list of package names)

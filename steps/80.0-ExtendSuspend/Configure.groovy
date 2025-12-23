@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-// RUN_AS_ROOT
+// RUN_VIA_SUDO
 // --- Documentation ---
 // Summary: Extend systemd-logind idle suspend timeout and action using drop-in config.
 // Config keys: idleAction (string), timeout (ISO-8601 duration), timeoutSeconds (number legacy)
@@ -24,25 +24,39 @@ if (!idleAction) {
 }
 
 Long timeoutSeconds = null
+boolean disableIdle = false
 def timeoutSpec = stepConfig.timeout != null ? stepConfig.timeout : stepConfig.timeoutSeconds
 if (timeoutSpec instanceof Number) {
   timeoutSeconds = ((Number) timeoutSpec).longValue()
 } else if (timeoutSpec instanceof CharSequence) {
   def txt = timeoutSpec.toString().trim()
   if (!txt.isEmpty()) {
+    if (txt.equalsIgnoreCase("off") || txt.equalsIgnoreCase("inf")) {
+      disableIdle = true
+      timeoutSeconds = 0L
+    }
     try {
-      timeoutSeconds = Duration.parse(txt).seconds
+      if (!disableIdle) {
+        timeoutSeconds = Duration.parse(txt).seconds
+      }
     } catch (Exception ignored) {
-      timeoutSeconds = txt.isInteger() ? Long.parseLong(txt) : null
+      if (!disableIdle) {
+        timeoutSeconds = txt.isInteger() ? Long.parseLong(txt) : null
+      }
     }
   }
 }
-if (timeoutSeconds == null || timeoutSeconds <= 0) {
+if (!disableIdle && (timeoutSeconds == null || timeoutSeconds <= 0)) {
   timeoutSeconds = 3600L
 }
 
+String effectiveAction = idleAction
 String idleActionSec = timeoutSeconds + "s"
-String desired = """# Managed by debian-configure-devbox ExtendSuspend step\n[Login]\nIdleAction=${idleAction}\nIdleActionSec=${idleActionSec}\n"""
+if (disableIdle) {
+  effectiveAction = "ignore"
+  idleActionSec = "0"
+}
+String desired = """# Managed by debian-configure-devbox ExtendSuspend step\n[Login]\nIdleAction=${effectiveAction}\nIdleActionSec=${idleActionSec}\n"""
 
 def targetDir = Paths.get("/etc/systemd/logind.conf.d")
 def targetFile = targetDir.resolve("50-devbox-idle.conf").toFile()
@@ -60,7 +74,11 @@ if (!targetFile.exists() || targetFile.text.replaceAll(/\s+\z/, "") != desired.r
 }
 
 if (!changed) {
-  println "Idle suspend timeout already set to ${timeoutSeconds}s"
+  if (disableIdle) {
+    println "Idle suspend already disabled"
+  } else {
+    println "Idle suspend timeout already set to ${timeoutSeconds}s"
+  }
   System.exit(0)
 }
 
@@ -71,5 +89,9 @@ if (reload.code == 0) {
   println "Updated configuration; please restart systemd-logind or reboot to apply (rc=${reload.code})."
 }
 
-println "Set system idle suspend action to '${idleAction}' after ${timeoutSeconds}s."
+if (disableIdle) {
+  println "Disabled system idle suspend (IdleAction=ignore, IdleActionSec=0)."
+} else {
+  println "Set system idle suspend action to '${effectiveAction}' after ${timeoutSeconds}s."
+}
 System.exit(10)

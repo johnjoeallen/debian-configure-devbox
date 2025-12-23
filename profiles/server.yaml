@@ -34,3 +34,9 @@ steps:
 
   GitPrompt:
     enabled: true
+
+  ExtendSuspend:
+    # Ensure the system idle suspend is suspended (INF)
+    enabled: true
+    idleAction: suspend
+    timeout: INF

@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-// RUN_AS_ROOT
+// RUN_VIA_SUDO
 // Summary: Provision a local Debian apt mirror served via Apache.
 // Config keys: DebianMirror (map)
 // Notes: Installs apt-mirror + Apache, writes mirror configs, enables vhost, optional initial sync, cron refresh.

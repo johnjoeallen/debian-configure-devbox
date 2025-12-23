@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-// RUN_AS_ROOT
+// RUN_VIA_SUDO
 // --- Documentation ---
 // Summary: Move Docker's data-root to the configured path and update daemon.json.
 // Config keys: target (string)

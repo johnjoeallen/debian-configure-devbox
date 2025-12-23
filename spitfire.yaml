@@ -7,6 +7,10 @@
 #
 # Boolean flags accept true/false. Omit or set to null to inherit defaults.
 
+profiles:
+  - server
+  - dev
+
 steps:
   AdminGroupNopass:
     # Automatically add the invoking user to the passwordless admin group.
@@ -89,8 +93,6 @@ steps:
     runInitialSync: true
     cronEnabled: true
 
-  ExtendSuspend:
-    # Ensure the system idle suspend delay is extended.
+  NvidiaDriverInstall:
+    # Install NVIDIA drivers for Debian 13 using the Groovy runbook step.
     enabled: true
-    idleAction: suspend
-    timeout: PT1H

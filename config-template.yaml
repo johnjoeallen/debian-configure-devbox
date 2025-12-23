@@ -7,6 +7,16 @@
 #
 # Boolean flags accept true/false. Omit or set to null to inherit defaults.
 
+profiles:
+  # Optional profile names to load before base/host config. Ignored when --profiles is supplied.
+  # - server
+  # - dev
+
+userStepUsers:
+  # Optional allowlist of users permitted to run RUN_AS_USER steps.
+  # - alice
+  # - bob
+
 steps:
   AdminGroupNopass:
     # Automatically add the invoking user to the passwordless admin group.
@@ -129,4 +139,9 @@ steps:
     # Ensure the system idle suspend delay is extended.
     enabled: true
     idleAction: suspend
+    # Use OFF or INF to disable idle suspend while keeping the step enabled.
     timeout: PT1H
+
+  NvidiaDriverInstall:
+    # Install NVIDIA drivers for Debian 13 using the Groovy runbook step.
+    enabled: false

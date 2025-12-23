@@ -1,5 +1,6 @@
 #!/usr/bin/env groovy
 // RUN_AS_ROOT
+// PREREQ_ROOT
 // --- Documentation ---
 // Summary: Create a passwordless admin sudo group and add configured users.
 // Config keys: adminGroup (string), addCurrentUser (boolean), users (list of usernames)

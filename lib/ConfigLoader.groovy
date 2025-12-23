@@ -9,8 +9,12 @@ class ConfigLoader {
     if (cachedConfig != null) {
       return cachedConfig
     }
+    def baseFile = resolveBaseFile()
+    def hostFile = resolveHostFile()
+    def baseCfg = parseYamlFile(baseFile)
+    def hostCfg = parseYamlFile(hostFile)
     def profileDir = resolveProfileDir()
-    def profileNames = resolveProfileNames()
+    def profileNames = resolveProfileNames(baseCfg, hostCfg)
     List<File> profileFiles = []
     Map mergedProfiles = [:]
     profileNames.each { String name ->
@@ -18,10 +22,6 @@ class ConfigLoader {
       profileFiles << file
       mergedProfiles = deepMerge(mergedProfiles, parseYamlFile(file))
     }
-    def baseFile = resolveBaseFile()
-    def hostFile = resolveHostFile()
-    def baseCfg = parseYamlFile(baseFile)
-    def hostCfg = parseYamlFile(hostFile)
     Map combined = deepMerge(mergedProfiles, baseCfg)
     combined = deepMerge(combined, hostCfg)
     cachedMeta = [profiles: profileFiles, base: baseFile, host: hostFile]
@@ -133,9 +133,41 @@ class ConfigLoader {
     System.err.println("⚠️  Missing configuration for step '${key}'. Assuming disabled. Add a '${key}' entry under 'steps' (checked: ${hint}).")
   }
 
-  private static List<String> resolveProfileNames() {
+  private static List<String> resolveProfileNames(Map baseCfg, Map hostCfg) {
     def raw = System.getenv('CONFIG_PROFILES') ?: ''
-    raw.split(',')
+    def envProfiles = parseProfileNames(raw)
+    if (!envProfiles.isEmpty()) {
+      return envProfiles
+    }
+    def combined = new LinkedHashSet<String>()
+    combined.addAll(extractProfileNames(baseCfg))
+    combined.addAll(extractProfileNames(hostCfg))
+    return combined as List
+  }
+
+  private static List<String> extractProfileNames(Map cfg) {
+    if (cfg == null || !cfg.containsKey('profiles')) {
+      return []
+    }
+    return parseProfileNames(cfg.profiles)
+  }
+
+  private static List<String> parseProfileNames(Object raw) {
+    if (raw == null) {
+      return []
+    }
+    def names = []
+    if (raw instanceof Collection) {
+      raw.each { entry ->
+        def text = entry?.toString()?.trim()
+        if (text) {
+          names << text
+        }
+      }
+      return names
+    }
+    def text = raw.toString()
+    text.split(',')
       .collect { it.trim() }
       .findAll { it }
   }
