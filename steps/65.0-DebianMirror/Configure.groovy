@@ -229,15 +229,15 @@ distributions.each { dist ->
 }
 String suiteList = mainSuites.unique().join(' ')
 String componentList = components.join(' ')
-String postMirrorContent = """#!/bin/sh
+String postMirrorTemplate = '''#!/bin/sh
 set -u
 
 BASE_URL="http://deb.debian.org/debian"
-MIRROR_BASE="${mainBase}/mirror/deb.debian.org/debian"
-SUITES="${suiteList}"
-COMPONENTS="${componentList}"
+MIRROR_BASE="@MIRROR_BASE@"
+SUITES="@SUITES@"
+COMPONENTS="@COMPONENTS@"
 
-if [ "${includeContents ? "1" : "0"}" -eq 1 ]; then
+if [ "@INCLUDE_CONTENTS@" -eq 1 ]; then
   for suite in $SUITES; do
     for component in $COMPONENTS; do
       src="$BASE_URL/dists/$suite/$component/Contents-all.gz"
@@ -251,7 +251,12 @@ if [ "${includeContents ? "1" : "0"}" -eq 1 ]; then
 fi
 
 exit 0
-"""
+'''
+String postMirrorContent = postMirrorTemplate
+  .replace("@MIRROR_BASE@", "${mainBase}/mirror/deb.debian.org/debian")
+  .replace("@SUITES@", suiteList)
+  .replace("@COMPONENTS@", componentList)
+  .replace("@INCLUDE_CONTENTS@", includeContents ? "1" : "0")
 ensureFile(postMirrorHook, postMirrorContent, "0755", "root", "root", true)
 
 StringBuilder secListBuilder = new StringBuilder()
