@@ -100,6 +100,9 @@ def ensureFile = { String path, String content, String mode, String owner = "roo
   File file = new File(path)
   ensureParent(file)
   if (alwaysWrite || !file.exists() || file.text != content) {
+    if (file.exists()) {
+      println "Updating file content: ${path}"
+    }
     file.setText(content)
     changed = true
   }
