@@ -172,7 +172,7 @@ steps:
   Jellyfin:
     # Install Jellyfin Server from the upstream repository.
     enabled: true
-    release: bookworm
+    release: trixie
     packages:
       - jellyfin
   EspReplicate:
