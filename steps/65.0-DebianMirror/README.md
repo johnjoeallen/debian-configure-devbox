@@ -15,6 +15,7 @@ Provisions a local Debian mirror and publishes it through Apache.
 - `distributions` (list): Debian releases to mirror (default `bookworm`, `trixie`).
 - `components` (list): Repository components to include (default `main`, `contrib`, `non-free`, `non-free-firmware`).
 - `includeUpdates` / `includeBackports` (bool): Add `-updates` and `-backports` suites for each distribution (default `true`).
+- `includeContents` (bool): Mirror `Contents-*` indexes (default `true`).
 - `securitySuites` (list): Debian security suites to mirror (default `<distribution>-security`).
 - `threads` (int): Thread count for apt-mirror downloads (default `20`).
 - `runInitialSync` (bool): Run apt-mirror if the mirror tree does not yet exist (default `true`).

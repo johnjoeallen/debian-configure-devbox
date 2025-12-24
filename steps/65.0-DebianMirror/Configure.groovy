@@ -30,6 +30,7 @@ List<String> distributions = (cfg.distributions instanceof List ? cfg.distributi
 List<String> components = (cfg.components instanceof List ? cfg.components : []) ?: ["main", "contrib", "non-free", "non-free-firmware"]
 boolean includeUpdates = cfg.containsKey("includeUpdates") ? cfg.includeUpdates as boolean : true
 boolean includeBackports = cfg.containsKey("includeBackports") ? cfg.includeBackports as boolean : true
+boolean includeContents = cfg.containsKey("includeContents") ? cfg.includeContents as boolean : true
 List<String> securitySuites = (cfg.securitySuites instanceof List ? cfg.securitySuites : []) ?: distributions.collect { "${it}-security" }
 boolean runInitialSync = cfg.containsKey("runInitialSync") ? cfg.runInitialSync as boolean : true
 boolean cronEnabled = cfg.containsKey("cronEnabled") ? cfg.cronEnabled as boolean : true
@@ -192,6 +193,9 @@ mainListBuilder.append("############ Main Debian mirror ############\n")
 mainListBuilder.append("set base_path    ${mainBase}\n")
 mainListBuilder.append("set nthreads     ${threads}\n")
 mainListBuilder.append("set _tilde 0\n\n")
+if (includeContents) {
+  mainListBuilder.append("set _contents 1\n\n")
+}
 
 distributions.each { dist ->
   mainListBuilder.append("# ${dist}\n")

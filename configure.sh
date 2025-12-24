@@ -332,22 +332,27 @@ done
 
 if [[ ${#STEP_KEYS[@]} -gt 0 ]]; then
   declare -A STEP_KEY_SET=()
+  declare -A STEP_KEY_RAW=()
   for key in "${STEP_KEYS[@]}"; do
-    STEP_KEY_SET["$key"]=1
+    key_lc="$(printf '%s' "$key" | tr '[:upper:]' '[:lower:]')"
+    STEP_KEY_SET["$key_lc"]=1
+    STEP_KEY_RAW["$key_lc"]="$key"
   done
   filtered_steps=()
   found_keys=()
   for step in "${STEP_FILES[@]}"; do
     step_key="$(sed -nE "s/.*\\bstepKey\\b\\s*=\\s*['\"]([^'\"]+)['\"].*/\\1/p" "$step" | head -n1 || true)"
-    if [[ -n "$step_key" && -n "${STEP_KEY_SET[$step_key]:-}" ]]; then
+    step_key_lc="$(printf '%s' "$step_key" | tr '[:upper:]' '[:lower:]')"
+    if [[ -n "$step_key" && -n "${STEP_KEY_SET[$step_key_lc]:-}" ]]; then
       filtered_steps+=("$step")
-      found_keys+=("$step_key")
+      found_keys+=("$step_key_lc")
     fi
   done
   missing_keys=()
   for key in "${STEP_KEYS[@]}"; do
-    if [[ ! " ${found_keys[*]} " =~ " ${key} " ]]; then
-      missing_keys+=("$key")
+    key_lc="$(printf '%s' "$key" | tr '[:upper:]' '[:lower:]')"
+    if [[ ! " ${found_keys[*]} " =~ " ${key_lc} " ]]; then
+      missing_keys+=("${STEP_KEY_RAW[$key_lc]:-$key}")
     fi
   done
   if [[ ${#missing_keys[@]} -gt 0 ]]; then
