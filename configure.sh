@@ -357,7 +357,6 @@ if [[ ${#STEP_KEYS[@]} -gt 0 ]]; then
   STEP_FILES=("${filtered_steps[@]}")
 fi
 
-skipped_root_pre_nsswitch=()
 skipped_user_steps=()
 skipped_root_only_steps=()
 nsswitch_ready=0
@@ -472,7 +471,7 @@ for step in "${STEP_FILES[@]}"; do
     skipped_user_steps+=("$rel_path")
     continue
   fi
-  if [[ "$ROOT_ONLY" -eq 1 && ( "$requires_user_context" -eq 1 || "$requires_sudo_context" -eq 1 ) ]]; then
+  if [[ "$ROOT_ONLY" -eq 1 && "$requires_user_context" -eq 1 ]]; then
     echo "→ Skipping (root-only mode)."
     skipped_root_only_steps+=("$rel_path")
     continue
@@ -542,9 +541,6 @@ for step in "${STEP_FILES[@]}"; do
         fi ;;
   esac
 done
-if [[ "${#skipped_root_pre_nsswitch[@]}" -gt 0 ]]; then
-  printf 'ℹ️  Skipped pre-Nsswitch root steps (run as root to apply): %s\n' "${skipped_root_pre_nsswitch[*]}"
-fi
 if [[ "${#skipped_user_steps[@]}" -gt 0 ]]; then
   printf 'ℹ️  Skipped user-context steps (rerun as non-root with sudo): %s\n' "${skipped_user_steps[*]}"
 fi
