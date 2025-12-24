@@ -170,6 +170,13 @@ steps:
     bootloaderId: debian
     autoApprove: false
 
+  Jellyfin:
+    # Install Jellyfin Server from the upstream repository.
+    enabled: false
+    release: bookworm
+    packages:
+      - jellyfin
+
   SambaShares:
     # Configure Samba shares (standalone, share-level access).
     enabled: false
