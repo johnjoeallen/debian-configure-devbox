@@ -96,10 +96,10 @@ def ensureParent = { File file ->
   }
 }
 
-def ensureFile = { String path, String content, String mode, String owner = "root", String group = "root" ->
+def ensureFile = { String path, String content, String mode, String owner = "root", String group = "root", boolean alwaysWrite = false ->
   File file = new File(path)
   ensureParent(file)
-  if (!file.exists() || file.text != content) {
+  if (alwaysWrite || !file.exists() || file.text != content) {
     file.setText(content)
     changed = true
   }
@@ -249,7 +249,7 @@ fi
 
 exit 0
 """
-ensureFile(postMirrorHook, postMirrorContent, "0755")
+ensureFile(postMirrorHook, postMirrorContent, "0755", "root", "root", true)
 
 StringBuilder secListBuilder = new StringBuilder()
 secListBuilder.append("############ Debian Security mirror ############\n")
