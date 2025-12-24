@@ -214,8 +214,39 @@ mainListBuilder.append("set run_postmirror 1\n")
 String mainListContent = mainListBuilder.toString()
 ensureFile(mainMirrorList, mainListContent, "0644")
 
+List<String> mainSuites = []
+distributions.each { dist ->
+  mainSuites << dist
+  if (includeUpdates) {
+    mainSuites << "${dist}-updates"
+  }
+  if (includeBackports) {
+    mainSuites << "${dist}-backports"
+  }
+}
+String suiteList = mainSuites.unique().join(' ')
+String componentList = components.join(' ')
 String postMirrorContent = """#!/bin/sh
-# Placeholder hook executed after apt-mirror syncs.
+set -u
+
+BASE_URL="http://deb.debian.org/debian"
+MIRROR_BASE="${mainBase}/mirror/deb.debian.org/debian"
+SUITES="${suiteList}"
+COMPONENTS="${componentList}"
+
+if [ "${includeContents ? "1" : "0"}" -eq 1 ]; then
+  for suite in $SUITES; do
+    for component in $COMPONENTS; do
+      src="$BASE_URL/dists/$suite/$component/Contents-all.gz"
+      dest="$MIRROR_BASE/dists/$suite/$component/Contents-all.gz"
+      mkdir -p "$(dirname "$dest")"
+      if ! curl -fsSL -z "$dest" -o "$dest" "$src"; then
+        echo "WARN: unable to fetch $src" >&2
+      fi
+    done
+  done
+fi
+
 exit 0
 """
 ensureFile(postMirrorHook, postMirrorContent, "0755")
