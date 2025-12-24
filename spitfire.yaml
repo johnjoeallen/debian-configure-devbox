@@ -168,6 +168,13 @@ steps:
       - path: /data
         clients:
           - tornado
+
+  Jellyfin:
+    # Install Jellyfin Server from the upstream repository.
+    enabled: true
+    release: bookworm
+    packages:
+      - jellyfin
   EspReplicate:
     # Replicate the EFI System Partition and install GRUB on matching disks.
     # Use true to apply, false to skip, or info to display planned actions only.
