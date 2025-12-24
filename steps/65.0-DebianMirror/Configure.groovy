@@ -96,10 +96,13 @@ def ensureParent = { File file ->
   }
 }
 
-def ensureFile = { String path, String content, String mode, String owner = "root", String group = "root" ->
+def ensureFile = { String path, String content, String mode, String owner = "root", String group = "root", boolean alwaysWrite = false ->
   File file = new File(path)
   ensureParent(file)
-  if (!file.exists() || file.text != content) {
+  if (alwaysWrite || !file.exists() || file.text != content) {
+    if (file.exists()) {
+      println "Updating file content: ${path}"
+    }
     file.setText(content)
     changed = true
   }
@@ -214,11 +217,42 @@ mainListBuilder.append("set run_postmirror 1\n")
 String mainListContent = mainListBuilder.toString()
 ensureFile(mainMirrorList, mainListContent, "0644")
 
+List<String> mainSuites = []
+distributions.each { dist ->
+  mainSuites << dist
+  if (includeUpdates) {
+    mainSuites << "${dist}-updates"
+  }
+  if (includeBackports) {
+    mainSuites << "${dist}-backports"
+  }
+}
+String suiteList = mainSuites.unique().join(' ')
+String componentList = components.join(' ')
 String postMirrorContent = """#!/bin/sh
-# Placeholder hook executed after apt-mirror syncs.
+set -u
+
+BASE_URL="http://deb.debian.org/debian"
+MIRROR_BASE="${mainBase}/mirror/deb.debian.org/debian"
+SUITES="${suiteList}"
+COMPONENTS="${componentList}"
+
+if [ "${includeContents ? "1" : "0"}" -eq 1 ]; then
+  for suite in $SUITES; do
+    for component in $COMPONENTS; do
+      src="$BASE_URL/dists/$suite/$component/Contents-all.gz"
+      dest="$MIRROR_BASE/dists/$suite/$component/Contents-all.gz"
+      mkdir -p "$(dirname "$dest")"
+      if ! curl -fsSL -z "$dest" -o "$dest" "$src"; then
+        echo "WARN: unable to fetch $src" >&2
+      fi
+    done
+  done
+fi
+
 exit 0
 """
-ensureFile(postMirrorHook, postMirrorContent, "0755")
+ensureFile(postMirrorHook, postMirrorContent, "0755", "root", "root", true)
 
 StringBuilder secListBuilder = new StringBuilder()
 secListBuilder.append("############ Debian Security mirror ############\n")
