@@ -199,8 +199,20 @@ maps.eachWithIndex { mapConfig, idx ->
 
   def mountDir = new File(mountPath)
   if (!mountDir.exists()) {
-    runOrFail("mkdir -p ${mountPath}", "create ${mountPath}")
-    changed = true
+    def mkdirResult = sh("mkdir -p ${mountPath}")
+    if (mkdirResult.code != 0) {
+      def errMsg = mkdirResult.err ?: mkdirResult.out
+      if (errMsg?.toLowerCase()?.contains("permission denied")) {
+        println "Warning: unable to create ${mountPath} (permission denied); autofs may already manage it"
+      } else {
+        System.err.println("create ${mountPath} failed")
+        if (mkdirResult.out) System.err.println(mkdirResult.out)
+        if (mkdirResult.err) System.err.println(mkdirResult.err)
+        System.exit(1)
+      }
+    } else {
+      changed = true
+    }
   }
 }
 

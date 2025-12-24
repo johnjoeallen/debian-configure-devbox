@@ -57,6 +57,22 @@ steps:
     # Install and enforce pam_mkhomedir for creating home directories.
     enabled: true
 
+  Autofs:
+    # Configure autofs maps for on-demand mounts.
+    enabled: true
+    # Optional; defaults to /etc/auto.master.d/devbox.autofs
+    masterFile: /etc/auto.master.d/tornado.autofs
+    maps:
+      /mnt/auto/spitfire:
+        # Optional; defaults to /etc/auto.<name> where name derives from mount or name.
+        mapFile: /etc/auto.tornado
+        # Options applied on the master line, e.g. --timeout, --ghost.
+        options: "--timeout=300 --ghost"
+        entries:
+          data:
+            options: "-fstype=nfs,rw"
+            location: "spitfire:/data"
+
   DockerInstall:
     # Install Docker Engine and related tooling from the official repository.
     enabled: true

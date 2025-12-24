@@ -190,3 +190,13 @@ steps:
         forceGroup: sharegroup
         createMask: "0664"
         directoryMask: "0775"
+
+  NfsServer:
+    # Enable an NFS server and export configured paths.
+    enabled: false
+    defaultOptions: rw,sync,no_subtree_check,no_root_squash
+    exports:
+      - path: /data
+        clients:
+          - tornado
+        options: rw,sync,no_subtree_check,no_root_squash
