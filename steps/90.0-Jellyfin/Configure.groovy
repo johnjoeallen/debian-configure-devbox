@@ -201,7 +201,7 @@ def ensureApacheProxy = { Map proxyCfg ->
       System.exit(1)
     }
     def staging = certbotStaging
-    runOrFail("DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot", "install certbot")
+    runOrFail("DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot python3-certbot-apache", "install certbot")
     def args = ["certbot", "--apache", "--non-interactive", "--agree-tos", "--email", certbotEmail]
     if (staging) {
       args << "--staging"
