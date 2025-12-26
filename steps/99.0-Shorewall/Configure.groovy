@@ -2,7 +2,7 @@
 // RUN_VIA_SUDO
 // --- Documentation ---
 // Summary: Install Shorewall and ensure HTTP/S ports are open.
-// Config keys: rulesFile, rules, cronDisabled (unused)
+// Config keys: rulesFile, rules, allowIncomingHttp
 // Notes: Appends ACCEPT rules to `/etc/shorewall/rules` and reloads Shorewall when new lines appear.
 
 import lib.ConfigLoader
@@ -18,7 +18,9 @@ if (!ConfigLoader.stepEnabled(stepKey)) {
 Map cfg = ConfigLoader.stepConfig(stepKey)
 
 def rulesFilePath = stringValue(cfg.rulesFile) ?: "/etc/shorewall/rules"
-def configuredRules = (cfg.rules instanceof Collection && !cfg.rules.isEmpty()) ? cfg.rules : defaultRules()
+def allowIncomingHttp = boolFlag(cfg.allowIncomingHttp, true)
+def configuredRules = (cfg.rules instanceof Collection && !cfg.rules.isEmpty()) ? cfg.rules :
+  (allowIncomingHttp ? defaultRules() : [])
 
 ensurePackages()
 def rulesChanged = ensureRules(rulesFilePath, configuredRules)

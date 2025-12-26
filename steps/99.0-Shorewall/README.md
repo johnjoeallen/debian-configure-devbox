@@ -17,6 +17,7 @@ steps:
       - port: 443
         comment: Allow HTTPS
 ```
+Set `allowIncomingHttp: false` in the step config when you only want the firewall glue without automatically opening 80/443; otherwise the defaults ensure those ports are permitted on the WAN.
 
 Each rule can override `source`/`target`/`proto`, append `options`, or set `disabled: true` to skip it. If you need a different rules file (e.g. `/etc/shorewall/rules.local`), set `rulesFile`.
 
