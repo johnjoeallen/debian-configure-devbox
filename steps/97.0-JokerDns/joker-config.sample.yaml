@@ -1,5 +1,3 @@
-ipSource: https://checkip.amazonaws.com
-cacheFile: /etc/cachedexternalip
 jokerEndpoint: https://svc.joker.com/nic/update
 timeoutSeconds: 15
 user: joker-user

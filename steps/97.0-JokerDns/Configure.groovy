@@ -2,7 +2,7 @@
 // RUN_VIA_SUDO
 // --- Documentation ---
 // Summary: Update Joker Dynamic DNS entries when the public IP changes.
-// Config keys: configFile, ipSource, cacheFile, jokerEndpoint, timeoutSeconds
+// Config keys: configFile, jokerEndpoint, timeoutSeconds, scriptPath, cronSchedule, cronLogFile, cronDisabled, sdkmanDir
 // Notes: Reads the external IP, compares it to the cached value, and issues Joker updates via their NIC API.
 
 import lib.ConfigLoader
@@ -13,6 +13,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import static lib.StepUtils.writeText
 
 final String stepKey = "JokerDns"
@@ -37,8 +39,6 @@ if (!(raw instanceof Map)) {
 }
 Map data = raw as Map
 
-def ipSource = stringValue(data.ipSource) ?: stringValue(cfg.ipSource) ?: "https://checkip.amazonaws.com"
-def cacheFilePath = stringValue(data.cacheFile) ?: stringValue(cfg.cacheFile) ?: "/etc/cachedexternalip"
 def jokerEndpoint = stringValue(data.jokerEndpoint) ?: stringValue(cfg.jokerEndpoint) ?: "https://svc.joker.com/nic/update"
 def timeoutSeconds = (numberValue(data.timeoutSeconds) ?: numberValue(cfg.timeoutSeconds) ?: 10) as int
 def timeoutMs = timeoutSeconds * 1000
@@ -57,23 +57,6 @@ def sdkmanDir = stringValue(cfg.sdkmanDir) ?: "/root/.sdkman"
 ensureRunnerScript(repoRoot, configPath, scriptPath, sdkmanDir)
 ensureCron(cronPath, cronSchedule, cronLogFile, scriptPath, configPath, cronDisabled)
 
-def cacheFile = new File(cacheFilePath)
-cacheFile.parentFile?.mkdirs()
-if (!cacheFile.exists()) {
-  cacheFile.createNewFile()
-}
-def cachedIp = cacheFile.text?.trim()
-def externalIp = fetchExternalIp(ipSource, timeoutMs)
-if (!externalIp) {
-  System.err.println("⚠️  Unable to determine external IP from ${ipSource}")
-  System.exit(1)
-}
-if (externalIp == cachedIp) {
-  println "✔️  External IP unchanged (${externalIp})"
-  System.exit(0)
-}
-
-cacheFile.text = "${externalIp}\n"
 
 def eligible = updates.collect { entry ->
   if (entry instanceof String) {
@@ -103,7 +86,7 @@ eligible.each { Map entry ->
     System.err.println("⚠️  Skipping incomplete entry: ${entry}")
     return
   }
-  def result = callJoker(jokerEndpoint, user, password, domain, externalIp, timeoutMs)
+  def result = callJoker(jokerEndpoint, user, password, domain, timeoutMs)
   println("→ ${domain}: ${result}")
 }
 
@@ -133,29 +116,12 @@ static Number numberValue(Object value) {
   }
 }
 
-static String fetchExternalIp(String source, int timeout) {
-  try {
-    def url = new URL(source)
-    def conn = (HttpURLConnection) url.openConnection()
-    conn.connectTimeout = timeout
-    conn.readTimeout = timeout
-    conn.setRequestProperty("User-Agent", "joker-updater/1.0")
-    conn.inputStream.withReader(StandardCharsets.UTF_8) { reader ->
-      return reader.readLine()?.trim()
-    }
-  } catch (Exception e) {
-    System.err.println("⚠️  Failed to fetch IP: ${e.message}")
-    return null
-  }
-}
-
-static String callJoker(String endpoint, String user, String password, String domain, String ip, int timeout) {
+static String callJoker(String endpoint, String user, String password, String domain, int timeout) {
   try {
     def query = [
       username: user,
       password: password,
-      hostname: domain,
-      myip: ip
+      hostname: domain
     ].collect { k, v ->
       "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
     }.join("&")
@@ -164,8 +130,10 @@ static String callJoker(String endpoint, String user, String password, String do
     conn.connectTimeout = timeout
     conn.readTimeout = timeout
     conn.setRequestProperty("User-Agent", "joker-updater/1.0")
-    conn.inputStream.withReader(StandardCharsets.UTF_8) { reader ->
-      return reader.readLine()?.trim() ?: "no response"
+    conn.inputStream.withCloseable { stream ->
+      new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).withCloseable { reader ->
+        return reader.readLine()?.trim() ?: "no response"
+      }
     }
   } catch (Exception e) {
     return "error (${e.message})"

@@ -7,8 +7,6 @@ This step keeps Joker-managed hostnames in sync with the system’s current publ
 Copy `steps/97.0-JokerDns/joker-config.sample.yaml` to `/etc/joker.yaml` (or another location you specify via `steps.JokerDns.configFile`) and edit the `updates` block:
 
 ```yaml
-ipSource: https://checkip.amazonaws.com
-cacheFile: /etc/cachedexternalip
 jokerEndpoint: https://svc.joker.com/nic/update
 timeoutSeconds: 15
 user: joker-user
@@ -41,5 +39,5 @@ steps:
     configFile: /etc/joker.yaml
 ```
 
-Other overrides such as `ipSource`, `cacheFile`, `jokerEndpoint`, and `timeoutSeconds` can be defined in this step entry if you prefer not to store them in the external YAML file.
+Other overrides such as `jokerEndpoint`, `timeoutSeconds`, `scriptPath`, `cronSchedule`, `cronLogFile`, `cronDisabled`, and `sdkmanDir` can be defined in this step entry if you prefer not to store them in the external YAML file.
 The step also writes `/usr/local/bin/joker-dns-update` (or `scriptPath`) and `/etc/cron.d/joker-dns` with the provided `cronSchedule`. Adjust `cronSchedule`, `cronLogFile`, or `cronDisabled: true` in the step config or YAML file to control how often root runs the updater.
