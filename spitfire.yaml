@@ -198,8 +198,11 @@ steps:
       certbotEnabled: true
       certbotEmail: admin@dublinux.net
       certbotStaging: false
-      certbotExtraArgs:
-        - "--force-renewal"
+    certbotExtraArgs:
+      - "--force-renewal"
+  JokerDns:
+    enabled: true
+    configFile: /etc/joker.yaml
   EspReplicate:
     # Replicate the EFI System Partition and install GRUB on matching disks.
     # Use true to apply, false to skip, or info to display planned actions only.
