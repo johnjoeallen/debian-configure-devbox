@@ -155,10 +155,10 @@ steps:
           path: /data/share/rallen
           browseable: true
           readOnly: false
-        validUsers:
-          - rallen
-        forceUser: rallen
-        forceGroup: users
+          validUsers:
+            - rallen
+          forceUser: rallen
+          forceGroup: users
 
   NfsServer:
     # Export /data via NFS for trusted hosts.
@@ -175,6 +175,31 @@ steps:
     release: trixie
     packages:
       - jellyfin
+    apacheProxy:
+      enabled: true
+      documentRoot: /var/www/hosts/jellyfin
+      backendHost: 10.0.0.1
+      backendPort: 8096
+      websocketPath: /socket
+      siteName: jellyfin.dublinux.net
+      accessLog: /var/log/apache2/jellyfin.dublinux.net-access.log
+      errorLog: /var/log/apache2/jellyfin.dublinux.net-error.log
+      domains:
+        - host: jellyfin.dublinux.lan
+          https: false
+          certbot: false
+          redirect: false
+          accessLog: /var/log/apache2/jellyfin.dublinux.lan-access.log
+          errorLog: /var/log/apache2/jellyfin.dublinux.lan-error.log
+        - host: jellyfin.dublinux.net
+          https: true
+          certbot: true
+          redirect: true
+      certbotEnabled: true
+      certbotEmail: admin@dublinux.net
+      certbotStaging: false
+      certbotExtraArgs:
+        - "--force-renewal"
   EspReplicate:
     # Replicate the EFI System Partition and install GRUB on matching disks.
     # Use true to apply, false to skip, or info to display planned actions only.

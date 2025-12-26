@@ -1,0 +1,14 @@
+ipSource: https://checkip.amazonaws.com
+cacheFile: /etc/cachedexternalip
+jokerEndpoint: https://svc.joker.com/nic/update
+timeoutSeconds: 15
+updates:
+  - user: joker-user
+    password: placeholder
+    hostname: example.com
+  - user: joker-user
+    password: placeholder
+    hostname: mirror.example.com
+  - user: joker-user
+    password: placeholder
+    hostname: ssh.example.com

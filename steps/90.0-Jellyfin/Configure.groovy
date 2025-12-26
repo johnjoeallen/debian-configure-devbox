@@ -95,7 +95,11 @@ def resolveProxyDomains = { Map proxyCfg ->
     def httpsEnabled = boolFlag(raw.https, true)
     def shouldRedirect = boolFlag(raw.redirect, httpsEnabled)
     def certbotEnabled = boolFlag(raw.certbot, httpsEnabled)
-    entries << [host: host, https: httpsEnabled, redirect: shouldRedirect, certbot: certbotEnabled]
+    def defaultAccessLog = "/var/log/apache2/${host}-access.log"
+    def defaultErrorLog = "/var/log/apache2/${host}-error.log"
+    def accessLog = raw.accessLog?.toString()?.trim() ?: defaultAccessLog
+    def errorLog = raw.errorLog?.toString()?.trim() ?: defaultErrorLog
+    entries << [host: host, https: httpsEnabled, redirect: shouldRedirect, certbot: certbotEnabled, accessLog: accessLog, errorLog: errorLog]
   }
 
   if (proxyCfg.domains instanceof Collection) {
@@ -132,17 +136,10 @@ def ensureApacheProxy = { Map proxyCfg ->
     return false
   }
   def domainEntries = resolveProxyDomains(proxyCfg)
-  def firstDomain = domainEntries[0]
-  def serverName = firstDomain.host
-  def otherHosts = domainEntries.tail()*.host
-
   def documentRoot = proxyCfg.documentRoot?.toString()?.trim() ?: "/var/www/hosts/jellyfin"
   def backendHost = proxyCfg.backendHost?.toString()?.trim() ?: "127.0.0.1"
   def backendPort = proxyCfg.backendPort?.toString()?.trim() ?: "8096"
   def websocketPath = proxyCfg.websocketPath?.toString()?.trim() ?: "/socket"
-  def siteName = proxyCfg.siteName?.toString()?.trim() ?: serverName
-  def accessLog = proxyCfg.accessLog?.toString()?.trim() ?: "/var/log/apache2/${serverName}-access.log"
-  def errorLog = proxyCfg.errorLog?.toString()?.trim() ?: "/var/log/apache2/${serverName}-error.log"
 
   runOrFail("DEBIAN_FRONTEND=noninteractive apt-get install -y apache2", "install apache2")
   runOrFail("a2enmod proxy proxy_http proxy_wstunnel rewrite", "enable apache proxy modules")
@@ -151,55 +148,50 @@ def ensureApacheProxy = { Map proxyCfg ->
 
   def wsBackend = "ws://${backendHost}:${backendPort}${websocketPath}"
   def httpBackend = "http://${backendHost}:${backendPort}/"
+  def changed = false
 
-  def lines = []
-  lines << "<VirtualHost *:80>"
-  lines << "    ServerName ${serverName}"
-  if (!otherHosts.isEmpty()) {
-    lines << "    ServerAlias ${otherHosts.join(' ')}"
-  }
-  lines << "    DocumentRoot ${documentRoot}"
-  lines << ""
-  lines << "    ProxyPass \"${websocketPath}\" \"${wsBackend}\""
-  lines << "    ProxyPassReverse \"${websocketPath}\" \"${wsBackend}\""
-  lines << ""
-  lines << "    ProxyPass \"/\" \"${httpBackend}\""
-  lines << "    ProxyPassReverse \"/\" \"${httpBackend}\""
-  lines << ""
-  lines << "    ErrorLog ${errorLog}"
-  lines << "    CustomLog ${accessLog} combined"
-
-  def redirectHosts = domainEntries.findAll { it.redirect }.collect { it.host }
-  if (!redirectHosts.isEmpty()) {
+  domainEntries.each { entry ->
+    def host = entry.host
+    def lines = []
+    lines << "<VirtualHost *:80>"
+    lines << "    ServerName ${host}"
+    lines << "    DocumentRoot ${documentRoot}"
     lines << ""
-    lines << "    RewriteEngine on"
-    lines << "    RewriteCond %{HTTPS} !=on"
-    redirectHosts.eachWithIndex { host, idx ->
-      def suffix = (idx < redirectHosts.size() - 1) ? " [OR]" : ""
-      lines << "    RewriteCond %{HTTP_HOST} =${host}${suffix}"
+    lines << "    ProxyPass \"${websocketPath}\" \"${wsBackend}\""
+    lines << "    ProxyPassReverse \"${websocketPath}\" \"${wsBackend}\""
+    lines << ""
+    lines << "    ProxyPass \"/\" \"${httpBackend}\""
+    lines << "    ProxyPassReverse \"/\" \"${httpBackend}\""
+    lines << ""
+    lines << "    ErrorLog ${entry.errorLog}"
+    lines << "    CustomLog ${entry.accessLog} combined"
+    if (entry.redirect) {
+      lines << ""
+      lines << "    RewriteEngine on"
+      lines << "    RewriteCond %{HTTPS} !=on"
+      lines << "    RewriteCond %{HTTP_HOST} =${host}"
+      lines << "    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [END,NE,R=permanent]"
     }
-    lines << "    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [END,NE,R=permanent]"
-  }
+    lines << "</VirtualHost>"
 
-  lines << "</VirtualHost>"
-  def content = lines.join("\n") + "\n"
+    def slug = host.replaceAll('[^A-Za-z0-9._-]', '_')
+    def siteName = "${slug}.conf"
+    def sitePath = "/etc/apache2/sites-available/${siteName}"
+    def siteFile = new File(sitePath)
+    def content = lines.join("\n") + "\n"
+    if (!siteFile.exists() || siteFile.text != content) {
+      backup(sitePath)
+      writeText(sitePath, content)
+      println "Updating file content: ${sitePath}"
+      changed = true
+    }
 
-  def siteFileName = siteName.endsWith(".conf") ? siteName : "${siteName}.conf"
-  def sitePath = "/etc/apache2/sites-available/${siteFileName}"
-  def siteFile = new File(sitePath)
-  boolean updated = false
-  if (!siteFile.exists() || siteFile.text != content) {
-    backup(sitePath)
-    writeText(sitePath, content)
-    println "Updating file content: ${sitePath}"
-    updated = true
-  }
-
-  def enabledPath = "/etc/apache2/sites-enabled/${siteFileName}"
-  def enabledFile = new File(enabledPath)
-  if (!enabledFile.exists()) {
-    runOrFail("a2ensite ${shellQuote(siteFileName)}", "enable apache site ${siteFileName}")
-    updated = true
+    def enabledPath = "/etc/apache2/sites-enabled/${siteName}"
+    def enabledFile = new File(enabledPath)
+    if (!enabledFile.exists()) {
+      runOrFail("a2ensite ${shellQuote(siteName)}", "enable apache site ${siteName}")
+      changed = true
+    }
   }
 
   def certbotEnabledGlobally = boolFlag(proxyCfg.certbotEnabled, true)
@@ -208,6 +200,7 @@ def ensureApacheProxy = { Map proxyCfg ->
   def certbotExtraArgs = proxyCfg.certbotExtraArgs
   def certbotHosts = domainEntries.findAll { it.https && it.certbot }.collect { it.host }
   def certbotChanged = false
+  def certbotTargetHost = domainEntries[0]?.host ?: "jellyfin"
   if (!certbotHosts.isEmpty() && certbotEnabledGlobally) {
     if (isBlank(certbotEmail)) {
       System.err.println("Jellyfin apacheProxy.certbotEmail is required when certbot is requested")
@@ -238,14 +231,14 @@ def ensureApacheProxy = { Map proxyCfg ->
       }
     }
     def cmd = args.collect { shellQuote(it) }.join(" ")
-    runOrFail(cmd, "run certbot for ${serverName}")
+    runOrFail(cmd, "run certbot for ${certbotTargetHost}")
     certbotChanged = true
   }
 
-  if (updated || certbotChanged) {
+  if (changed || certbotChanged) {
     runOrFail("systemctl reload apache2", "reload apache2")
   }
-  return updated || certbotChanged
+  return changed || certbotChanged
 }
 
 String release = cfg.release?.toString()?.trim()
