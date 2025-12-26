@@ -193,9 +193,9 @@ steps:
           errorLog: /var/log/apache2/jellyfin.dublinux.lan-error.log
         - host: jellyfin.dublinux.net
           https: true
-          certbot: true
+          certbot: false
           redirect: true
-      certbotEnabled: true
+      certbotEnabled: false
       certbotEmail: admin@dublinux.net
       certbotStaging: false
     certbotExtraArgs:
