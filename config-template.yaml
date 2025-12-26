@@ -184,16 +184,18 @@ steps:
       backendPort: 8096
       websocketPath: /socket
       siteName: jellyfin.dublinux.net
-      accessLog: /var/log/apache2/jellyfin.dublinux.net-access.log
-      errorLog: /var/log/apache2/jellyfin.dublinux.net-error.log
       domains:
         - host: jellyfin.dublinux.net
           https: true
           certbot: true
           redirect: true
+          accessLog: /var/log/apache2/jellyfin.dublinux.net-access.log
+          errorLog: /var/log/apache2/jellyfin.dublinux.net-error.log
         - host: jellyfin.dublinux.lan
           https: false
           certbot: false
+          accessLog: /var/log/apache2/jellyfin.dublinux.lan-access.log
+          errorLog: /var/log/apache2/jellyfin.dublinux.lan-error.log
       certbotEnabled: true
       certbotEmail: admin@dublinux.net
       certbotStaging: false
