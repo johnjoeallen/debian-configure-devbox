@@ -1,0 +1,13 @@
+# Joker Dynamic DNS updater configuration (keep a real file outside version control, e.g. /etc/joker.yaml).
+ipSource: https://checkip.amazonaws.com
+cacheFile: /etc/cachedexternalip
+jokerEndpoint: https://svc.joker.com/nic/update
+timeoutSeconds: 15
+updates:
+  - user: user1
+    password: secret
+    hostname: example.com
+  - user: another
+    password: s3cr3t
+    domain: internal.example.lan
+    disabled: false
