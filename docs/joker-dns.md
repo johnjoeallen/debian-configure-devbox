@@ -12,14 +12,24 @@ cacheFile: /etc/cachedexternalip
 jokerEndpoint: https://svc.joker.com/nic/update
 timeoutSeconds: 15
 updates:
-  - user: user1
-    password: secret
+  - user: joker-user
+    password: sadf78a9
     hostname: example.com
-  - user: another
-    password: s3cr3t
-    domain: internal.example.lan
-    disabled: false
+  - user: joker-user
+    password: sadf78a9
+    hostname: mirror.example.com
+  - user: joker-user
+    password: sadf78a9
+    hostname: ssh.example.com
+  - user: joker-user
+    password: sadf78a9
+    hostname: netnanny.example.com
+  - user: joker-user
+    password: sadf78a9
+    hostname: jellyfin.example.net
 ```
+
+The same placeholder values live in `config/joker-config.sample.yaml`; replace them with your actual Joker credentials/hosts when you copy the file to `/etc/joker.yaml`.
 
 Each `updates` entry may use either `hostname` or `domain`. Setting `disabled: true` skips that entry.
 
