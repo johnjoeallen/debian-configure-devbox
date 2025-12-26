@@ -176,6 +176,32 @@ steps:
     release: bookworm
     packages:
       - jellyfin
+    # Optional: expose Jellyfin through Apache with proxying/rewrite/certbot.
+    apacheProxy:
+      enabled: false
+      documentRoot: /var/www/hosts/jellyfin
+      backendHost: 10.0.0.1
+      backendPort: 8096
+      websocketPath: /socket
+      siteName: jellyfin.dublinux.net
+      accessLog: /var/log/apache2/jellyfin.dublinux.net-access.log
+      errorLog: /var/log/apache2/jellyfin.dublinux.net-error.log
+      domains:
+        - host: jellyfin.dublinux.net
+          https: true
+          certbot: true
+          redirect: true
+        - host: jellyfin.int.dublinux.lan
+          https: false
+          certbot: false
+      certbot:
+        enabled: true
+        email: admin@dublinux.net
+        domains:
+          - jellyfin.dublinux.net
+        # staging: true
+        # extraArgs:
+        #   - "--force-renewal"
 
   SambaShares:
     # Configure Samba shares (standalone, share-level access).

@@ -21,6 +21,24 @@ if (!ConfigLoader.stepEnabled(stepKey)) {
 Map cfg = ConfigLoader.stepConfig(stepKey)
 
 def isBlank = { Object value -> value == null || value.toString().trim().isEmpty() }
+def boolFlag = { Object value, boolean defaultValue ->
+  if (value == null) {
+    return defaultValue
+  }
+  if (value instanceof Boolean) {
+    return (boolean) value
+  }
+  def text = value.toString().trim().toLowerCase()
+  if (!text) {
+    return defaultValue
+  }
+  return ["1", "true", "yes", "y"].contains(text)
+}
+
+def shellQuote = { String text ->
+  def safe = text.replace("'", "'\\''")
+  return "'${safe}'"
+}
 
 def resolveRelease = {
   def osRelease = new File("/etc/os-release")
@@ -62,6 +80,172 @@ def runOrFail = { String cmd, String context ->
     System.exit(1)
   }
   res
+}
+
+def resolveProxyDomains = { Map proxyCfg ->
+  def entries = []
+  def seen = new LinkedHashSet<String>()
+  def addDomain = { Map raw ->
+    def host = raw.host ?: raw.hostname ?: raw.serverName ?: raw.domain
+    host = host?.toString()?.trim()
+    if (isBlank(host) || seen.contains(host)) {
+      return
+    }
+    seen << host
+    def httpsEnabled = boolFlag(raw.https, true)
+    def shouldRedirect = boolFlag(raw.redirect, httpsEnabled)
+    def certbotEnabled = boolFlag(raw.certbot, httpsEnabled)
+    entries << [host: host, https: httpsEnabled, redirect: shouldRedirect, certbot: certbotEnabled]
+  }
+
+  if (proxyCfg.domains instanceof Collection) {
+    proxyCfg.domains.each { entry ->
+      if (entry instanceof Map) {
+        addDomain(entry as Map)
+      }
+    }
+  }
+
+  if (entries.isEmpty()) {
+    def fallbackHost = proxyCfg.serverName?.toString()?.trim()
+    if (!isBlank(fallbackHost)) {
+      def certbotCfg = (proxyCfg.certbot instanceof Map) ? (Map) proxyCfg.certbot : [:]
+      def httpsEnabled = boolFlag(proxyCfg.httpsEnabled, true)
+      def redirectEnabled = boolFlag(proxyCfg.redirectToHttps, httpsEnabled)
+      def fallbackCertbot = boolFlag(certbotCfg.enabled, httpsEnabled)
+      addDomain([
+        host: fallbackHost,
+        https: httpsEnabled,
+        redirect: redirectEnabled,
+        certbot: fallbackCertbot
+      ])
+    }
+  }
+  if (entries.isEmpty()) {
+    System.err.println("Jellyfin apacheProxy requires either 'domains' or 'serverName'")
+    System.exit(1)
+  }
+  entries
+}
+
+def ensureApacheProxy = { Map proxyCfg ->
+  if (!boolFlag(proxyCfg.enabled, false)) {
+    return false
+  }
+  def domainEntries = resolveProxyDomains(proxyCfg)
+  def firstDomain = domainEntries[0]
+  def serverName = firstDomain.host
+  def otherHosts = domainEntries.tail()*.host
+
+  def documentRoot = proxyCfg.documentRoot?.toString()?.trim() ?: "/var/www/hosts/jellyfin"
+  def backendHost = proxyCfg.backendHost?.toString()?.trim() ?: "127.0.0.1"
+  def backendPort = proxyCfg.backendPort?.toString()?.trim() ?: "8096"
+  def websocketPath = proxyCfg.websocketPath?.toString()?.trim() ?: "/socket"
+  def siteName = proxyCfg.siteName?.toString()?.trim() ?: serverName
+  def accessLog = proxyCfg.accessLog?.toString()?.trim() ?: "/var/log/apache2/${serverName}-access.log"
+  def errorLog = proxyCfg.errorLog?.toString()?.trim() ?: "/var/log/apache2/${serverName}-error.log"
+
+  runOrFail("DEBIAN_FRONTEND=noninteractive apt-get install -y apache2", "install apache2")
+  runOrFail("a2enmod proxy proxy_http proxy_wstunnel rewrite", "enable apache proxy modules")
+
+  runOrFail("mkdir -p ${shellQuote(documentRoot)}", "create document root")
+
+  def wsBackend = "ws://${backendHost}:${backendPort}${websocketPath}"
+  def httpBackend = "http://${backendHost}:${backendPort}/"
+
+  def lines = []
+  lines << "<VirtualHost *:80>"
+  lines << "    ServerName ${serverName}"
+  if (!otherHosts.isEmpty()) {
+    lines << "    ServerAlias ${otherHosts.join(' ')}"
+  }
+  lines << "    DocumentRoot ${documentRoot}"
+  lines << ""
+  lines << "    ProxyPass \"${websocketPath}\" \"${wsBackend}\""
+  lines << "    ProxyPassReverse \"${websocketPath}\" \"${wsBackend}\""
+  lines << ""
+  lines << "    ProxyPass \"/\" \"${httpBackend}\""
+  lines << "    ProxyPassReverse \"/\" \"${httpBackend}\""
+  lines << ""
+  lines << "    ErrorLog ${errorLog}"
+  lines << "    CustomLog ${accessLog} combined"
+
+  def redirectHosts = domainEntries.findAll { it.redirect }.collect { it.host }
+  if (!redirectHosts.isEmpty()) {
+    lines << ""
+    lines << "    RewriteEngine on"
+    lines << "    RewriteCond %{HTTPS} !=on"
+    redirectHosts.eachWithIndex { host, idx ->
+      def suffix = (idx < redirectHosts.size() - 1) ? " [OR]" : ""
+      lines << "    RewriteCond %{HTTP_HOST} =${host}${suffix}"
+    }
+    lines << "    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [END,NE,R=permanent]"
+  }
+
+  lines << "</VirtualHost>"
+  def content = lines.join("\n") + "\n"
+
+  def siteFileName = siteName.endsWith(".conf") ? siteName : "${siteName}.conf"
+  def sitePath = "/etc/apache2/sites-available/${siteFileName}"
+  def siteFile = new File(sitePath)
+  boolean updated = false
+  if (!siteFile.exists() || siteFile.text != content) {
+    backup(sitePath)
+    writeText(sitePath, content)
+    println "Updating file content: ${sitePath}"
+    updated = true
+  }
+
+  def enabledPath = "/etc/apache2/sites-enabled/${siteFileName}"
+  def enabledFile = new File(enabledPath)
+  if (!enabledFile.exists()) {
+    runOrFail("a2ensite ${shellQuote(siteFileName)}", "enable apache site ${siteFileName}")
+    updated = true
+  }
+
+  def certbotCfg = (proxyCfg.certbot instanceof Map) ? (Map) proxyCfg.certbot : [:]
+  def certbotHosts = domainEntries.findAll { it.https && it.certbot }.collect { it.host }
+  def certbotChanged = false
+  if (!certbotHosts.isEmpty()) {
+    def certbotEmail = certbotCfg.email?.toString()?.trim()
+    if (isBlank(certbotEmail)) {
+      System.err.println("Jellyfin apacheProxy.certbot.email is required when certbot is enabled")
+      System.exit(1)
+    }
+    def staging = boolFlag(certbotCfg.staging, false)
+    runOrFail("DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot", "install certbot")
+    def args = ["certbot", "certonly", "--webroot", "--non-interactive", "--agree-tos", "--email", certbotEmail, "--webroot-path", documentRoot]
+    if (staging) {
+      args << "--staging"
+    }
+    certbotHosts.each { host ->
+      args << "-d"
+      args << host
+    }
+    def extraArgs = certbotCfg.extraArgs
+    if (extraArgs instanceof Collection) {
+      extraArgs.each { entry ->
+        def token = entry?.toString()?.trim()
+        if (token) {
+          args << token
+        }
+      }
+    } else if (extraArgs instanceof String) {
+      extraArgs.split('\\s+').each { token ->
+        if (token) {
+          args << token
+        }
+      }
+    }
+    def cmd = args.collect { shellQuote(it) }.join(" ")
+    runOrFail(cmd, "run certbot for ${serverName}")
+    certbotChanged = true
+  }
+
+  if (updated || certbotChanged) {
+    runOrFail("systemctl reload apache2", "reload apache2")
+  }
+  return updated || certbotChanged
 }
 
 String release = cfg.release?.toString()?.trim()
@@ -144,5 +328,6 @@ if (!missingPackages.isEmpty()) {
 }
 
 runOrFail("systemctl enable --now jellyfin", "enable jellyfin service")
+changed = ensureApacheProxy((cfg.apacheProxy instanceof Map) ? (Map) cfg.apacheProxy : [:]) || changed
 
 System.exit(changed ? 10 : 0)
