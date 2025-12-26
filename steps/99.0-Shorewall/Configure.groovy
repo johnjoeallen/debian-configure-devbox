@@ -22,6 +22,25 @@ def allowIncomingHttp = boolFlag(cfg.allowIncomingHttp, true)
 def configuredRules = (cfg.rules instanceof Collection && !cfg.rules.isEmpty()) ? cfg.rules :
   (allowIncomingHttp ? defaultRules() : [])
 
+def enableRpFilter = boolFlag(cfg.enableRpFilter, true)
+def sysctlFilePath = stringValue(cfg.sysctlFile) ?: "/etc/sysctl.d/98-shorewall.conf"
+
+String sysctlContent(boolean rp) {
+  def lines = [
+    "net.ipv4.ip_forward = 1",
+    "net.ipv4.conf.all.send_redirects = 0",
+    "net.ipv4.conf.default.send_redirects = 0"
+  ]
+  if (rp) {
+    lines += [
+      "net.ipv4.conf.all.rp_filter = 1",
+      "net.ipv4.conf.default.rp_filter = 1"
+    ]
+  }
+  return lines.join("\n") + "\n"
+}
+
+ensureSysctl(sysctlFilePath, enableRpFilter)
 ensurePackages()
 def rulesChanged = ensureRules(rulesFilePath, configuredRules)
 if (rulesChanged) {
@@ -49,6 +68,18 @@ def ensurePackages() {
     }
   }
   sh("systemctl enable --now shorewall")
+}
+
+def ensureSysctl(String path, boolean rpFilter) {
+  def file = new File(path)
+  file.parentFile?.mkdirs()
+  def content = sysctlContent(rpFilter)
+  if (!file.exists() || file.text != content) {
+    backup(path)
+    writeText(path, content)
+    println "✅ Sysctl config updated (${path})"
+  }
+  sh("sysctl --system >/dev/null") // apply changes
 }
 
 def ensureRules(String path, Collection ruleDefs) {

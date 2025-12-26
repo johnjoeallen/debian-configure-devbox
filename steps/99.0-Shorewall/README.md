@@ -1,6 +1,6 @@
 # Shorewall firewall rules
 
-This step keeps Shorewall installed, ensures the firewall service is enabled, and adds explicit `ACCEPT net fw tcp <port>` rules so HTTP/HTTPS traffic can reach the machine.
+This step keeps Shorewall installed, ensures the firewall service is enabled, configures `/etc/sysctl.d/98-shorewall.conf` to enable IPv4 forwarding (and optional rp_filter), and adds explicit `ACCEPT net fw tcp <port>` rules so HTTP/HTTPS traffic can reach the machine.
 
 ## Configuration (`steps.Shorewall`)
 
@@ -17,8 +17,8 @@ steps:
       - port: 443
         comment: Allow HTTPS
 ```
-Set `allowIncomingHttp: false` in the step config when you only want the firewall glue without automatically opening 80/443; otherwise the defaults ensure those ports are permitted on the WAN.
+Set `allowIncomingHttp: false` in the step config when you only want the firewall glue without automatically opening 80/443; otherwise the defaults ensure those ports are permitted on the WAN. Use `enableRpFilter: false` if rp_filter conflicts with your environment.
 
 Each rule can override `source`/`target`/`proto`, append `options`, or set `disabled: true` to skip it. If you need a different rules file (e.g. `/etc/shorewall/rules.local`), set `rulesFile`.
 
-The step installs `shorewall`, enables the service, appends any missing lines at the end of the specified rules file, runs `shorewall check`, and reloads the service when it added new lines.
+The step installs `shorewall`, enables the service, appends any missing lines at the end of the specified rules file, runs `shorewall check`, and reloads the service when it added new lines. It also applies the sysctl snippet with `sysctl --system` so forwarding/rp_filter take effect before Shorewall reloads.
