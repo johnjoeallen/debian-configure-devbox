@@ -193,9 +193,9 @@ steps:
           errorLog: /var/log/apache2/jellyfin.dublinux.lan-error.log
         - host: jellyfin.dublinux.net
           https: true
-          certbot: false
+          certbot: true
           redirect: true
-      certbotEnabled: false
+      certbotEnabled: true
       certbotEmail: admin@dublinux.net
       certbotStaging: false
     certbotExtraArgs:
@@ -209,4 +209,11 @@ steps:
     enabled: true
     bootloaderId: debian
     autoApprove: false
+  Shorewall:
+    enabled: true
+    rules:
+      - port: 80
+        comment: "Allow HTTP"
+      - port: 443
+        comment: "Allow HTTPS"
     
