@@ -40,4 +40,4 @@ steps:
 ```
 
 Other overrides such as `jokerEndpoint`, `timeoutSeconds`, `scriptPath`, `cronSchedule`, `cronLogFile`, `cronDisabled`, and `sdkmanDir` can be defined in this step entry if you prefer not to store them in the external YAML file.
-The step also writes `/usr/local/bin/joker-dns-update` (or `scriptPath`) and `/etc/cron.d/joker-dns` with the provided `cronSchedule`. Adjust `cronSchedule`, `cronLogFile`, or `cronDisabled: true` in the step config or YAML file to control how often root runs the updater.
+The step also writes `/usr/local/bin/joker-dns-update` (or `scriptPath`) and `/etc/cron.d/joker-dns` with the provided `cronSchedule`. Adjust `cronSchedule`, `cronLogFile`, or `cronDisabled: true` in the step config if you want a different schedule or to disable cron.

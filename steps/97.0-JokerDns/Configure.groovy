@@ -52,9 +52,8 @@ def cronPath = stringValue(cfg.cronPath) ?: "/etc/cron.d/joker-dns"
 def cronSchedule = stringValue(cfg.cronSchedule) ?: "* * * * *"
 def cronLogFile = stringValue(cfg.cronLogFile) ?: "/var/log/joker-dns.log"
 def cronDisabled = boolFlag(cfg.cronDisabled, false)
-def sdkmanDir = stringValue(cfg.sdkmanDir) ?: "/root/.sdkman"
 
-ensureRunnerScript(repoRoot, configPath, scriptPath, sdkmanDir)
+ensureRunnerScript(repoRoot, configPath, scriptPath)
 ensureCron(cronPath, cronSchedule, cronLogFile, scriptPath, configPath, cronDisabled)
 
 
@@ -154,7 +153,7 @@ static boolean boolFlag(Object value, boolean defaultValue) {
   return ["1", "true", "yes", "y"].contains(text)
 }
 
-def ensureRunnerScript(String repoRoot, String configPath, String scriptPath, String sdkmanDir) {
+def ensureRunnerScript(String repoRoot, String configPath, String scriptPath) {
   def file = new File(scriptPath)
   file.parentFile?.mkdirs()
   def content = """#!/bin/sh
@@ -164,8 +163,7 @@ CONFIG_FILE="\${1:-${configPath}}"
 if [ -n "\${JOKER_CONFIG:-}" ]; then
   CONFIG_FILE="\${JOKER_CONFIG}"
 fi
-SDKMAN_DIR="${sdkmanDir}"
-PATH="${sdkmanDir}/candidates/groovy/current/bin:/usr/local/bin:/usr/bin:/bin"
+PATH="/usr/local/bin:/usr/bin:/bin"
 GROOVY_BIN="\$(command -v groovy || true)"
 if [ -z "\$GROOVY_BIN" ]; then
   echo "⚠️  groovy not found; install Groovy via SDKMAN before running this script." >&2
