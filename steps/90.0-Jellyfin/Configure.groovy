@@ -109,10 +109,9 @@ def resolveProxyDomains = { Map proxyCfg ->
   if (entries.isEmpty()) {
     def fallbackHost = proxyCfg.serverName?.toString()?.trim()
     if (!isBlank(fallbackHost)) {
-      def certbotCfg = (proxyCfg.certbot instanceof Map) ? (Map) proxyCfg.certbot : [:]
       def httpsEnabled = boolFlag(proxyCfg.httpsEnabled, true)
       def redirectEnabled = boolFlag(proxyCfg.redirectToHttps, httpsEnabled)
-      def fallbackCertbot = boolFlag(certbotCfg.enabled, httpsEnabled)
+      def fallbackCertbot = boolFlag(proxyCfg.certbotEnabled, httpsEnabled)
       addDomain([
         host: fallbackHost,
         https: httpsEnabled,
@@ -203,16 +202,18 @@ def ensureApacheProxy = { Map proxyCfg ->
     updated = true
   }
 
-  def certbotCfg = (proxyCfg.certbot instanceof Map) ? (Map) proxyCfg.certbot : [:]
+  def certbotEnabledGlobally = boolFlag(proxyCfg.certbotEnabled, true)
+  def certbotEmail = proxyCfg.certbotEmail?.toString()?.trim()
+  def certbotStaging = boolFlag(proxyCfg.certbotStaging, false)
+  def certbotExtraArgs = proxyCfg.certbotExtraArgs
   def certbotHosts = domainEntries.findAll { it.https && it.certbot }.collect { it.host }
   def certbotChanged = false
-  if (!certbotHosts.isEmpty()) {
-    def certbotEmail = certbotCfg.email?.toString()?.trim()
+  if (!certbotHosts.isEmpty() && certbotEnabledGlobally) {
     if (isBlank(certbotEmail)) {
-      System.err.println("Jellyfin apacheProxy.certbot.email is required when certbot is enabled")
+      System.err.println("Jellyfin apacheProxy.certbotEmail is required when certbot is requested")
       System.exit(1)
     }
-    def staging = boolFlag(certbotCfg.staging, false)
+    def staging = certbotStaging
     runOrFail("DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot", "install certbot")
     def args = ["certbot", "certonly", "--webroot", "--non-interactive", "--agree-tos", "--email", certbotEmail, "--webroot-path", documentRoot]
     if (staging) {
@@ -222,16 +223,15 @@ def ensureApacheProxy = { Map proxyCfg ->
       args << "-d"
       args << host
     }
-    def extraArgs = certbotCfg.extraArgs
-    if (extraArgs instanceof Collection) {
-      extraArgs.each { entry ->
+    if (certbotExtraArgs instanceof Collection) {
+      certbotExtraArgs.each { entry ->
         def token = entry?.toString()?.trim()
         if (token) {
           args << token
         }
       }
-    } else if (extraArgs instanceof String) {
-      extraArgs.split('\\s+').each { token ->
+    } else if (certbotExtraArgs instanceof String) {
+      certbotExtraArgs.split('\\s+').each { token ->
         if (token) {
           args << token
         }

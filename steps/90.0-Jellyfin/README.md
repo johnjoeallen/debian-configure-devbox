@@ -29,16 +29,13 @@ steps:
         - host: internal.jellyfin.lan
           https: false
           certbot: false
-      certbot:
-        enabled: true
-        email: admin@dublinux.net
-        domains:
-          - jellyfin.dublinux.net
-        staging: false
-        extraArgs:
-          - "--force-renewal"
+      certbotEnabled: true
+      certbotEmail: admin@dublinux.net
+      certbotStaging: false
+      certbotExtraArgs:
+        - "--force-renewal"
 ```
 
 The step ensures `/etc/apt/sources.list.d/jellyfin.list` exists, stores the key at `/usr/share/keyrings/jellyfin-archive-keyring.gpg`, runs `apt-get update` when the repo definition changes, and installs the requested packages before enabling and starting `jellyfin.service`.
 
-When `apacheProxy.enabled` is true, the step installs Apache, enables the required modules, writes the HTTP vhost, enables the site, reloads Apache, and optionally requests a certificate with `certbot` using the webroot plugin. Certificates always cover every `domains.host` that declares `certbot: true`; HTTP requests to a domain that sets `redirect: true` are redirected to HTTPS.
+When `apacheProxy.enabled` is true, the step installs Apache, enables the required modules, writes the HTTP vhost, enables the site, reloads Apache, and optionally requests certificates with `certbot` using the webroot plugin. Certificates cover every `domains.host` that sets `certbot: true`; HTTP requests to hosts flagged with `redirect: true` are redirected to HTTPS. Use the top-level `certbotEnabled`, `certbotEmail`, `certbotStaging`, and `certbotExtraArgs` fields to control the certbot invocation.

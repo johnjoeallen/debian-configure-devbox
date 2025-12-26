@@ -191,17 +191,14 @@ steps:
           https: true
           certbot: true
           redirect: true
-        - host: jellyfin.int.dublinux.lan
+        - host: jellyfin.dublinux.lan
           https: false
           certbot: false
-      certbot:
-        enabled: true
-        email: admin@dublinux.net
-        domains:
-          - jellyfin.dublinux.net
-        # staging: true
-        # extraArgs:
-        #   - "--force-renewal"
+      certbotEnabled: true
+      certbotEmail: admin@dublinux.net
+      certbotStaging: false
+      certbotExtraArgs:
+        - "--force-renewal"
 
   SambaShares:
     # Configure Samba shares (standalone, share-level access).
