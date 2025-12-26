@@ -42,6 +42,8 @@ def jokerEndpoint = stringValue(data.jokerEndpoint) ?: stringValue(cfg.jokerEndp
 def timeoutSeconds = (numberValue(data.timeoutSeconds) ?: numberValue(cfg.timeoutSeconds) ?: 10) as int
 def timeoutMs = timeoutSeconds * 1000
 def updates = (data.updates instanceof Collection) ? (Collection) data.updates : []
+def globalUser = stringValue(data.user) ?: stringValue(cfg.user)
+def globalPassword = stringValue(data.password) ?: stringValue(cfg.password)
 
 def cacheFile = new File(cacheFilePath)
 cacheFile.parentFile?.mkdirs()
@@ -61,7 +63,14 @@ if (externalIp == cachedIp) {
 
 cacheFile.text = "${externalIp}\n"
 
-def eligible = updates.findAll { entry ->
+def eligible = updates.collect { entry ->
+  if (entry instanceof String) {
+    return [hostname: entry]
+  } else if (entry instanceof Map) {
+    return entry
+  }
+  return null
+}.findAll { entry ->
   entry instanceof Map && !boolFlag(entry.disabled, false)
 }
 
@@ -71,9 +80,13 @@ if (eligible.isEmpty()) {
 }
 
 eligible.each { Map entry ->
-  def user = stringValue(entry.user)
-  def password = stringValue(entry.password)
+  def user = stringValue(entry.user) ?: globalUser
+  def password = stringValue(entry.password) ?: globalPassword
   def domain = stringValue(entry.hostname) ?: stringValue(entry.domain)
+  if (!user || !password) {
+    System.err.println("⚠️  Missing Joker credentials (global or entry-level) for ${domain ?: entry}; skipping.")
+    return
+  }
   if (!user || !password || !domain) {
     System.err.println("⚠️  Skipping incomplete entry: ${entry}")
     return

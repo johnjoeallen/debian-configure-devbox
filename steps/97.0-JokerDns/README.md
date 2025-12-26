@@ -11,13 +11,19 @@ ipSource: https://checkip.amazonaws.com
 cacheFile: /etc/cachedexternalip
 jokerEndpoint: https://svc.joker.com/nic/update
 timeoutSeconds: 15
+user: joker-user
+password: placeholder
 updates:
-  - user: joker-user
-    password: placeholder
-    hostname: example.com
-  - user: joker-user
-    password: placeholder
-    hostname: mirror.example.com
+  - example.com
+  - mirror.example.com
+```
+
+If you need per-host overrides (e.g. to mark a host as disabled or use a different user/pass), set an entry as a mapping:
+
+```yaml
+updates:
+  - hostname: special.example.com
+    disabled: false
 ```
 
 Each `updates` entry may use either `hostname` or `domain`. Set `disabled: true` to skip an entry without deleting it.
