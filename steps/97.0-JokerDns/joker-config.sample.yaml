@@ -4,6 +4,10 @@ jokerEndpoint: https://svc.joker.com/nic/update
 timeoutSeconds: 15
 user: joker-user
 password: placeholder
+scriptPath: /usr/local/bin/joker-dns-update
+cronSchedule: "* * * * *"
+cronLogFile: /var/log/joker-dns.log
+sdkmanDir: /root/.sdkman
 updates:
   - example.com
   - mirror.example.com

@@ -13,6 +13,10 @@ jokerEndpoint: https://svc.joker.com/nic/update
 timeoutSeconds: 15
 user: joker-user
 password: placeholder
+scriptPath: /usr/local/bin/joker-dns-update
+cronSchedule: "* * * * *"
+cronLogFile: /var/log/joker-dns.log
+sdkmanDir: /root/.sdkman
 updates:
   - example.com
   - mirror.example.com
@@ -38,3 +42,4 @@ steps:
 ```
 
 Other overrides such as `ipSource`, `cacheFile`, `jokerEndpoint`, and `timeoutSeconds` can be defined in this step entry if you prefer not to store them in the external YAML file.
+The step also writes `/usr/local/bin/joker-dns-update` (or `scriptPath`) and `/etc/cron.d/joker-dns` with the provided `cronSchedule`. Adjust `cronSchedule`, `cronLogFile`, or `cronDisabled: true` in the step config or YAML file to control how often root runs the updater.

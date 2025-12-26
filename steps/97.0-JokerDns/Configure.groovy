@@ -13,6 +13,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import static lib.StepUtils.writeText
 
 final String stepKey = "JokerDns"
 if (!ConfigLoader.stepEnabled(stepKey)) {
@@ -44,6 +45,17 @@ def timeoutMs = timeoutSeconds * 1000
 def updates = (data.updates instanceof Collection) ? (Collection) data.updates : []
 def globalUser = stringValue(data.user) ?: stringValue(cfg.user)
 def globalPassword = stringValue(data.password) ?: stringValue(cfg.password)
+
+def repoRoot = new File('.').canonicalPath
+def scriptPath = stringValue(cfg.scriptPath) ?: "/usr/local/bin/joker-dns-update"
+def cronPath = stringValue(cfg.cronPath) ?: "/etc/cron.d/joker-dns"
+def cronSchedule = stringValue(cfg.cronSchedule) ?: "* * * * *"
+def cronLogFile = stringValue(cfg.cronLogFile) ?: "/var/log/joker-dns.log"
+def cronDisabled = boolFlag(cfg.cronDisabled, false)
+def sdkmanDir = stringValue(cfg.sdkmanDir) ?: "/root/.sdkman"
+
+ensureRunnerScript(repoRoot, configPath, scriptPath, sdkmanDir)
+ensureCron(cronPath, cronSchedule, cronLogFile, scriptPath, configPath, cronDisabled)
 
 def cacheFile = new File(cacheFilePath)
 cacheFile.parentFile?.mkdirs()
@@ -172,4 +184,50 @@ static boolean boolFlag(Object value, boolean defaultValue) {
     return defaultValue
   }
   return ["1", "true", "yes", "y"].contains(text)
+}
+
+def ensureRunnerScript(String repoRoot, String configPath, String scriptPath, String sdkmanDir) {
+  def file = new File(scriptPath)
+  file.parentFile?.mkdirs()
+  def content = """#!/bin/sh
+set -euo pipefail
+ROOT_DIR='${repoRoot}'
+CONFIG_FILE="\${1:-${configPath}}"
+if [ -n "\${JOKER_CONFIG:-}" ]; then
+  CONFIG_FILE="\${JOKER_CONFIG}"
+fi
+SDKMAN_DIR="${sdkmanDir}"
+PATH="${sdkmanDir}/candidates/groovy/current/bin:/usr/local/bin:/usr/bin:/bin"
+GROOVY_BIN="\$(command -v groovy || true)"
+if [ -z "\$GROOVY_BIN" ]; then
+  echo "⚠️  groovy not found; install Groovy via SDKMAN before running this script." >&2
+  exit 1
+fi
+cd "\$ROOT_DIR"
+exec "\$GROOVY_BIN" -cp "\$ROOT_DIR/lib/snakeyaml-2.2.jar" "\$ROOT_DIR/steps/97.0-JokerDns/Configure.groovy" "\$CONFIG_FILE"
+"""
+  if (!file.exists() || file.text != content) {
+    writeText(scriptPath, content)
+  }
+  file.setExecutable(true, false)
+}
+
+def ensureCron(String cronPath, String schedule, String logPath, String scriptPath, String configPath, boolean disabled) {
+  def cronFile = new File(cronPath)
+  if (disabled) {
+    if (cronFile.exists()) {
+      cronFile.delete()
+    }
+    println "ℹ️  Joker cron disabled (removed ${cronPath})."
+    return
+  }
+  def logFile = new File(logPath)
+  logFile.parentFile?.mkdirs()
+  def content = """# Joker DNS updater
+${schedule} root ${scriptPath} ${configPath} >> ${logPath} 2>&1
+"""
+  if (!cronFile.exists() || cronFile.text != content) {
+    writeText(cronPath, content)
+    println "✅ Joker cron scheduled (${schedule} → ${cronPath})."
+  }
 }
