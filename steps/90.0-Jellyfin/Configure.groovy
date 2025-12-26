@@ -152,26 +152,19 @@ def ensureApacheProxy = { Map proxyCfg ->
 
   domainEntries.each { entry ->
     def host = entry.host
-    def lines = []
-    lines << "<VirtualHost *:80>"
-    lines << "    ServerName ${host}"
-    lines << "    DocumentRoot ${documentRoot}"
-    lines << ""
-    lines << "    ProxyPass \"${websocketPath}\" \"${wsBackend}\""
-    lines << "    ProxyPassReverse \"${websocketPath}\" \"${wsBackend}\""
-    lines << ""
-    lines << "    ProxyPass \"/\" \"${httpBackend}\""
-    lines << "    ProxyPassReverse \"/\" \"${httpBackend}\""
-    lines << ""
-    lines << "    ErrorLog ${entry.errorLog}"
-    lines << "    CustomLog ${entry.accessLog} combined"
-    if (entry.redirect) {
-      lines << ""
-      lines << "    RewriteEngine on"
-      lines << "    RewriteCond %{HTTPS} !=on"
-      lines << "    RewriteCond %{HTTP_HOST} =${host}"
-      lines << "    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [END,NE,R=permanent]"
-    }
+  def lines = []
+  lines << "<VirtualHost *:80>"
+  lines << "    ServerName ${host}"
+  lines << "    DocumentRoot ${documentRoot}"
+  lines << ""
+  lines << "    ProxyPass \"${websocketPath}\" \"${wsBackend}\""
+  lines << "    ProxyPassReverse \"${websocketPath}\" \"${wsBackend}\""
+  lines << ""
+  lines << "    ProxyPass \"/\" \"${httpBackend}\""
+  lines << "    ProxyPassReverse \"/\" \"${httpBackend}\""
+  lines << ""
+  lines << "    ErrorLog ${entry.errorLog}"
+  lines << "    CustomLog ${entry.accessLog} combined"
     lines << "</VirtualHost>"
 
     def slug = host.replaceAll('[^A-Za-z0-9._-]', '_')
@@ -201,6 +194,7 @@ def ensureApacheProxy = { Map proxyCfg ->
   def certbotHosts = domainEntries.findAll { it.https && it.certbot }.collect { it.host }
   def certbotChanged = false
   def certbotTargetHost = domainEntries[0]?.host ?: "jellyfin"
+  def certbotRedirect = domainEntries.any { it.redirect }
   if (!certbotHosts.isEmpty() && certbotEnabledGlobally) {
     if (isBlank(certbotEmail)) {
       System.err.println("Jellyfin apacheProxy.certbotEmail is required when certbot is requested")
@@ -208,9 +202,12 @@ def ensureApacheProxy = { Map proxyCfg ->
     }
     def staging = certbotStaging
     runOrFail("DEBIAN_FRONTEND=noninteractive apt-get install -y certbot python3-certbot", "install certbot")
-    def args = ["certbot", "certonly", "--webroot", "--non-interactive", "--agree-tos", "--email", certbotEmail, "--webroot-path", documentRoot]
+    def args = ["certbot", "--apache", "--non-interactive", "--agree-tos", "--email", certbotEmail]
     if (staging) {
       args << "--staging"
+    }
+    if (certbotRedirect) {
+      args << "--redirect"
     }
     certbotHosts.each { host ->
       args << "-d"
