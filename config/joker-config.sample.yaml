@@ -4,10 +4,18 @@ cacheFile: /etc/cachedexternalip
 jokerEndpoint: https://svc.joker.com/nic/update
 timeoutSeconds: 15
 updates:
-  - user: user1
-    password: secret
-    hostname: example.com
-  - user: another
-    password: s3cr3t
-    domain: internal.example.lan
-    disabled: false
+  - user: 17e7444298b0ac73
+    password: 2eff408ed360f82d
+    hostname: dublinux.net
+  - user: 17e7444298b0ac73
+    password: 2eff408ed360f82d
+    hostname: mirror.dublinux.net
+  - user: 17e7444298b0ac73
+    password: 2eff408ed360f82d
+    hostname: ssh.dublinux.net
+  - user: 17e7444298b0ac73
+    password: 2eff408ed360f82d
+    hostname: netnanny.dublinux.net
+  - user: 17e7444298b0ac73
+    password: 2eff408ed360f82d
+    hostname: jellyfin.dublinux.net
