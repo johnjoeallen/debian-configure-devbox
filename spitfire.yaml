@@ -203,6 +203,9 @@ steps:
   JokerDns:
     enabled: true
     configFile: /etc/joker.yaml
+    scriptPath: /usr/local/bin/joker-dns-update
+    cronSchedule: "* * * * *"
+    cronLogFile: /var/log/joker-dns.log
   EspReplicate:
     # Replicate the EFI System Partition and install GRUB on matching disks.
     # Use true to apply, false to skip, or info to display planned actions only.
@@ -211,9 +214,4 @@ steps:
     autoApprove: false
   Shorewall:
     enabled: true
-    rules:
-      - port: 80
-        comment: "Allow HTTP"
-      - port: 443
-        comment: "Allow HTTPS"
     

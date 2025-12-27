@@ -202,6 +202,82 @@ steps:
       certbotExtraArgs:
         - "--force-renewal"
 
+  Shorewall:
+    # Manage Shorewall tables entirely from YAML.
+    # Sections are optional: defaults (common router layout) apply when the list is empty.
+    # Use this entry to override file locations, sysctl tweaks, or provide custom tables.
+    enabled: true
+    sysctlFile: /etc/sysctl.d/98-shorewall.conf   # path for generated kernel tunables
+    enableRpFilter: true                           # toggle rp_filter in the sysctl snippet
+    sysctl:
+      # Additional sysctl overrides appended to the default forwarding/send_redirects controls.
+      net.ipv4.ip_forward: 1
+      net.ipv4.conf.all.send_redirects: 0
+      net.ipv4.conf.default.send_redirects: 0
+    zones:
+      # Default gateway zones (loc for LAN, net for WAN, fw for the firewall itself).
+      - zone: loc
+        type: ipv4
+      - zone: net
+        type: ipv4
+      - zone: fw
+        type: firewall
+    interfaces:
+      # Real network interfaces mapped to zones (no fw entries here).
+      - interface: enp3s0
+        zone: loc
+      - interface: enp6s0
+        zone: net
+    policy:
+      # Base policy table: LAN→WAN/Firewall accept, WAN→LAN/FW drop, firewall allows traffic back to LAN.
+      - source: loc
+        dest: net
+        policy: ACCEPT
+      - source: loc
+        dest: fw
+        policy: ACCEPT
+      - source: fw
+        dest: loc
+        policy: ACCEPT
+      - source: fw
+        dest: net
+        policy: ACCEPT
+      - source: net
+        dest: fw
+        policy: DROP
+      - source: net
+        dest: loc
+        policy: DROP
+    masq:
+      # NAT the LAN and Docker ranges out the WAN interface.
+      - interface: enp6s0
+        source: 10.0.0.0/24
+      - interface: enp6s0
+        source: 172.17.0.0/16
+    rules:
+      # Allow the gateway itself to serve HTTP/S from the untrusted side when needed.
+      - action: ACCEPT
+        source: net
+        dest: fw
+        proto: tcp
+        port: 80
+        comment: Allow HTTP to the gateway
+      - action: ACCEPT
+        source: net
+        dest: fw
+        proto: tcp
+        port: 443
+        comment: Allow HTTPS to the gateway
+
+  JokerDns:
+    # Keep Joker dynamic DNS entries in sync via a cron job running Update.groovy.
+    enabled: false
+    configFile: /etc/joker.yaml
+    scriptPath: /usr/local/bin/joker-dns-update
+    cronSchedule: "* * * * *"
+    cronLogFile: /var/log/joker-dns.log
+    cronDisabled: false
+
   SambaShares:
     # Configure Samba shares (standalone, share-level access).
     enabled: false
