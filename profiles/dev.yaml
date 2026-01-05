@@ -20,6 +20,9 @@ steps:
   JetbrainsToolbox:
     enabled: true
 
+  JokerDns:
+    enabled: false
+
   Insomnia:
     enabled: true
 
@@ -43,3 +46,27 @@ steps:
 
   GitPrompt:
     enabled: true
+
+  NisServer:
+    enabled: false
+
+  DebianMirror:
+    enabled: false
+
+  NvidiaDriverInstall:
+    enabled: false
+
+  EspReplicate:
+    enabled: false
+
+  Jellyfin:
+    enabled: false
+
+  SambaShares:
+    enabled: false
+
+  NfsServer:
+    enabled: false
+
+  Shorewall:
+    enabled: false

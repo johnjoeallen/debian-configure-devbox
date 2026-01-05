@@ -319,7 +319,7 @@ rm -f "$user_list_script"
 if [[ -n "$USER_STEP_USERS" ]]; then
   echo "    User-step allowlist: $USER_STEP_USERS"
 fi
-readarray -d '' STEP_FILES < <(find "$STEPS_DIR" -mindepth 1 -maxdepth 2 -type f -name '*.groovy' -print0 | sort -z)
+readarray -d '' STEP_FILES < <(find "$STEPS_DIR" -mindepth 1 -maxdepth 2 -type f -name 'Configure.groovy' -print0 | sort -z)
 
 if [[ ${#STEP_FILES[@]} -eq 0 ]]; then
   echo "⚠️  No step scripts found under $STEPS_DIR" >&2
