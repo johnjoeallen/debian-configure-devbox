@@ -42,13 +42,13 @@ if [ -n "\${JOKER_CONFIG:-}" ]; then
   CONFIG_FILE="\${JOKER_CONFIG}"
 fi
 PATH="/usr/local/bin:/usr/bin:/bin"
-GROOVY_BIN="$(command -v groovy || true)"
-if [ -z "$GROOVY_BIN" ]; then
+GROOVY_BIN="\$(command -v groovy || true)"
+if [ -z "\$GROOVY_BIN" ]; then
   echo "⚠️  groovy not found; install it before running the Joker updater." >&2
   exit 1
 fi
 cd "$ROOT_DIR"
-exec "$GROOVY_BIN" -cp "$ROOT_DIR/lib/snakeyaml-${yamlVersion}.jar" "$ROOT_DIR/steps/97.0-JokerDns/Update.groovy" "$CONFIG_FILE"
+exec "\$GROOVY_BIN" -cp "$ROOT_DIR/lib/snakeyaml-${yamlVersion}.jar" "$ROOT_DIR/steps/97.0-JokerDns/Update.groovy" "$CONFIG_FILE"
 """
   if (!file.exists() || file.text != content) {
     backup(scriptPath)

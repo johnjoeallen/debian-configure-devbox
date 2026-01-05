@@ -41,7 +41,7 @@ steps:
 
   NisSetup:
     # Provide a domain to enable NIS provisioning; leave null to skip.
-    domain: dublinux.lab
+    domain: dublinux.lan
     # Either a bare host/IP or a full "ypserver <host>" line.
     server: 10.0.0.1
 
