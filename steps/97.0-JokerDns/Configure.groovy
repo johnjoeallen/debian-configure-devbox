@@ -35,11 +35,11 @@ def ensureRunnerScript(String rootDir, String scriptPath, String configPath, Str
 set -euo pipefail
 ROOT_DIR='${rootDir}'
 CONFIG_FILE='${configPath}'
-if [ -n "${1:-}" ]; then
-  CONFIG_FILE="${1}"
+if [ -n "\${1:-}" ]; then
+  CONFIG_FILE="\${1}"
 fi
-if [ -n "${JOKER_CONFIG:-}" ]; then
-  CONFIG_FILE="${JOKER_CONFIG}"
+if [ -n "\${JOKER_CONFIG:-}" ]; then
+  CONFIG_FILE="\${JOKER_CONFIG}"
 fi
 PATH="/usr/local/bin:/usr/bin:/bin"
 GROOVY_BIN="$(command -v groovy || true)"
